@@ -10,12 +10,16 @@ class LocalStore(context: Context) : AtlasStore {
   val raw = prefs.getString("snapshot", null)
   if (raw == null) Snapshot() else {
    val o = JSONObject(raw)
-   val t = o.optJSONObject("trip")?.let { Trip(it.getString("id"),it.getString("route"),it.getLong("start"),it.getInt("next"),it.getLong("last"), Mode.valueOf(it.optString("mode", "SIMULATOR"))) }
-   require(t == null || (Catalog.routes.any { it.id == t.routeId } && t.nextStop in 0..3))
-   val a = o.getJSONArray("awards")
-   Snapshot(t, (0 until a.length()).map { a.getJSONObject(it) }.map { Award(it.getString("id"),it.getString("route"),it.getBoolean("sim"),it.getLong("time")) })
+   val t = runCatching {
+    o.optJSONObject("trip")?.let { Trip(it.getString("id"),it.getString("route"),it.getLong("start"),it.getInt("next"),it.getLong("last"), Mode.valueOf(it.optString("mode", "SIMULATOR"))) }
+   }.getOrNull()
+   val a = o.optJSONArray("awards")
+   val awards = if (a == null) emptyList() else (0 until a.length()).mapNotNull { index ->
+    runCatching { a.getJSONObject(index).let { Award(it.getString("id"),it.getString("route"),it.getBoolean("sim"),it.getLong("time")) } }.getOrNull()
+   }
+   Snapshot(t, awards).validatedForRestore()
   }
- } catch (_: Exception) { Snapshot() } // Corrupt records never create awards or unlock safety.
+ } catch (_: Exception) { Snapshot() } // Unreadable JSON fails closed; bad records cannot unlock safety.
  override fun save(snapshot: Snapshot) {
   val o = JSONObject()
   snapshot.trip?.let { o.put("trip",JSONObject().put("id",it.id).put("route",it.routeId).put("start",it.startedMs).put("next",it.nextStop).put("last",it.lastEvidenceMs).put("mode",it.mode.name)) }

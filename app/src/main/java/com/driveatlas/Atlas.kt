@@ -24,7 +24,7 @@ interface AtlasStore { fun load(): Snapshot; fun save(snapshot: Snapshot) }
  * Neither speed=0 nor a stoplight is evidence of PARKED. No real adapter is enabled in this alpha. */
 interface VehicleAdapter { fun safety(): Safety; fun locationStatus(): LocationStatus; fun evidence(): Evidence? }
 class AtlasEngine(private val store: AtlasStore, val mode: Mode) {
- var snapshot = store.load(); private set
+ var snapshot = store.load().validatedForRestore(); private set
  var safety = Safety.UNKNOWN; private set
  var location = LocationStatus.LOST; private set
  val canEdit get() = safety == Safety.PARKED
