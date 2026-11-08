@@ -48,14 +48,14 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-internal val Ink = Color(0xFF203D38)
-internal val Paper = Color(0xFFF5F1E7)
-internal val White = Color(0xFFFFFDF7)
-internal val Muted = Color(0xFF687970)
-internal val Line = Color(0xFFD7DDCF)
-internal val Sage = Color(0xFFE5EBDE)
-internal val Amber = Color(0xFFF1BD63)
-internal val Coral = Color(0xFFD97658)
+internal val Ink = Color(0xFF202720)
+internal val Paper = Color(0xFFF4F5F2)
+internal val White = Color(0xFFFFFFFF)
+internal val Muted = Color(0xFF6D756E)
+internal val Line = Color(0xFFE0E5DF)
+internal val Sage = Color(0xFFE8F0EA)
+internal val Amber = Color(0xFFBBDEB5)
+internal val Coral = Color(0xFF176B4D)
 internal val Mono = FontFamily.Monospace
 internal val Corner = RoundedCornerShape(12.dp)
 
@@ -79,7 +79,8 @@ class MainActivity : ComponentActivity() {
         setContent {
             MaterialTheme(colorScheme = lightColorScheme(primary = Ink, onPrimary = White,
                 secondary = Coral, background = Paper, surface = White, onSurface = Ink,
-                surfaceVariant = Sage, onSurfaceVariant = Muted, outline = Line)) { AtlasApp() }
+                surfaceVariant = Sage, onSurfaceVariant = Muted, outline = Line,
+                primaryContainer = Sage, onPrimaryContainer = Ink, secondaryContainer = Sage, onSecondaryContainer = Ink)) { AtlasApp() }
         }
     }
 
@@ -136,8 +137,8 @@ class MainActivity : ComponentActivity() {
                     else Column(Modifier.fillMaxSize().verticalScroll(pageScroll)
                         .padding(horizontal = if (wide) 36.dp else 24.dp, vertical = 30.dp)) {
                         when (page) {
-                            "discover" -> GuideHome(engine.snapshot, { if (curation != it) filters.mood.value = if (it == "theme") "탁 트인" else "전체"; curation = it; page = "curation" },
-                                onTrip = { page = "trip" }, onAtlas = { page = "atlas" })
+                            "discover" -> GuideHome(engine.snapshot, { curation = it; page = "curation" },
+                                onTrip = { page = "trip" }, onAtlas = { page = "atlas" }, onRoute = ::open, filters = filters)
                             "curation" -> CurationPage(curation, filters, engine.snapshot.awards, ::open, { page = "discover" })
                             "records" -> RecordsPage(engine.snapshot, ::open)
                             "detail" -> RealDetailPage(selected, engine.snapshot.trip != null,
@@ -245,42 +246,8 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@Composable internal fun Sidebar(page: String, unlocked: Boolean, snapshot: Snapshot, wide: Boolean, compact: Boolean, onPage: (String) -> Unit, onDebug: () -> Unit) {
-    Column(Modifier.width(if (wide) 208.dp else 164.dp).fillMaxHeight().background(Ink).padding(20.dp)) {
-        PixelIcon("car", Amber, Modifier.size(if (compact) 37.dp else 53.dp).padding(top = 6.dp))
-        Spacer(Modifier.height(16.dp))
-        Text("DRIVE\nATLAS", color = White, fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 27.sp, lineHeight = 30.sp, letterSpacing = 1.5.sp)
-        if (!compact) Text("나의 여행 우표도감", color = Color(0xFFACBDA9), fontSize = 14.sp, modifier = Modifier.padding(top = 10.dp))
-        Spacer(Modifier.height(if (compact) 20.dp else 45.dp))
-        listOf(Triple("discover", "길 고르기", "compass"), Triple("records", "다녀온 길", "route"), Triple("atlas", "우표 도감", "book")).forEach { (id, title, icon) ->
-            val active = unlocked && (page == id || page in listOf("detail", "curation", "trip") && id == "discover")
-            Row(Modifier.fillMaxWidth().height(if (compact) 60.dp else 78.dp).clip(Corner)
-                .background(if (active) Amber else Color.Transparent)
-                .clickable(enabled = unlocked) { onPage(id) }.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                PixelIcon(icon, if (active) Ink else Color(0xFFB8C8BA), Modifier.size(26.dp))
-                Spacer(Modifier.width(13.dp))
-                Column {
-                    Text(title, color = if (active) Ink else Color(0xFFDCE5D7), fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                    if (id == "atlas") Text("${snapshot.awards.map { it.routeId }.distinct().size.toString().padStart(2, '0')} STAMPS", color = if (active) Ink.copy(alpha = .65f) else Color(0xFF9EB39E), fontFamily = Mono, fontSize = 10.sp, modifier = Modifier.padding(top = 4.dp))
-                }
-            }
-            Spacer(Modifier.height(10.dp))
-        }
-        if (snapshot.trip != null) TextButton(onClick = { onPage("trip") }, enabled = unlocked, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) { Text("진행 중인 여정  →", color = Amber, fontSize = 15.sp) }
-        Spacer(Modifier.weight(1f))
-        Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0xFF456158)))
-        Spacer(Modifier.height(22.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(7.dp).background(if (unlocked) Amber else Color(0xFF9BAD9A)))
-            Spacer(Modifier.width(8.dp))
-            Text(if (unlocked) "P · UX 제한 해제 확인" else "차량 상태 확인/제한", color = White, fontSize = 13.sp)
-        }
-        Text(if (BuildConfig.SIMULATOR) "PLEOS EMULATOR / LIVE" else "PLEOS CONNECTION", color = Color(0xFF91A58F), fontFamily = Mono, fontSize = 10.sp, modifier = Modifier.padding(top = 9.dp))
-        TextButton(onClick = onDebug, contentPadding = PaddingValues(0.dp), modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
-            Text("연결 상태 보기  +", color = Color(0xFFC9D5C3), fontSize = 12.sp)
-        }
-    }
-}
+@Composable internal fun Sidebar(page: String, unlocked: Boolean, snapshot: Snapshot, wide: Boolean, compact: Boolean, onPage: (String) -> Unit, onDebug: () -> Unit) =
+    DesignSidebar(page, unlocked, snapshot, wide, compact, onPage, onDebug)
 
 @Composable internal fun PageHeading(eyebrow: String, title: String, subtitle: String, right: @Composable (() -> Unit)? = null) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -467,72 +434,11 @@ class MainActivity : ComponentActivity() {
         }
     }
     Spacer(Modifier.height(26.dp))
-    NoteBlock("운전할 때는 풍경보다 안전을 먼저", "이 화면은 실제 차량·GPS와 연결되지 않은 가상 여정입니다. 주행 상태이거나 차량 상태를 모르면 조작이 잠깁니다.")
+    NoteBlock("운전할 때는 풍경보다 안전을 먼저", "차량 P·UX 신호로 조작을 제한합니다. 우표 여정의 위치 근거는 SIM 체험이며 실제 방문 인증이 아닙니다.")
 }
 
-@Composable internal fun AtlasPage(awards: List<Award>, onRoute: (Route) -> Unit, onExport: (Route, Award) -> Unit) {
-    val collected = awards.map { it.routeId }.distinct().size
-    PageHeading("TRAVEL STAMP ALBUM / VOL. 01", "차곡차곡, 나의 여행 우표", "지나온 길을 한 장씩 붙여 만드는 나만의 도감.") {
-        Column(horizontalAlignment = Alignment.End) {
-            Text(collected.toString().padStart(2, '0'), fontSize = 44.sp, fontFamily = Mono, fontWeight = FontWeight.Bold, color = Ink)
-            Eyebrow("COLLECTED STAMPS")
-        }
-    }
-    Surface(color = Ink, shape = Corner) {
-        Row(Modifier.fillMaxWidth().padding(27.dp), verticalAlignment = Alignment.CenterVertically) {
-            PixelIcon("book", Amber, Modifier.size(46.dp))
-            Spacer(Modifier.width(23.dp))
-            Column(Modifier.weight(1f)) {
-                Text(if (collected == 0) "첫 번째 우표를 기다리고 있어요" else "${collected}종의 여행 우표를 모았어요", color = White, fontSize = 25.sp, fontWeight = FontWeight.Bold)
-                Text("바다 · 숲 · 호수  /  첫 번째 여행 우표집", color = Color(0xFFB9CBB4), fontSize = 16.sp, modifier = Modifier.padding(top = 8.dp))
-            }
-            repeat(3) { index -> Box(Modifier.padding(start = 8.dp).size(23.dp).background(if (index < collected) Amber else Color(0xFF4C6557), RoundedCornerShape(3.dp))) }
-            Text("$collected / 3", color = Amber, fontSize = 24.sp, fontFamily = Mono, modifier = Modifier.padding(start = 24.dp))
-        }
-    }
-    Spacer(Modifier.height(28.dp))
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-        Catalog.routes.forEachIndexed { index, route ->
-            val award = awards.lastOrNull { it.routeId == route.id }
-            Surface(Modifier.weight(1f), color = White, shape = StampEdge, border = BorderStroke(1.dp, Line)) {
-                Column(Modifier.padding(15.dp)) {
-                    Row(Modifier.fillMaxWidth().padding(6.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Eyebrow("TRAVEL STAMP  0${index + 1}")
-                        PixelIcon(if (award == null) "lock" else "check", if (award == null) Muted else Coral, Modifier.size(20.dp))
-                    }
-                    Spacer(Modifier.height(12.dp))
-                    Box(Modifier.fillMaxWidth().height(240.dp).clip(RoundedCornerShape(6.dp))) {
-                        PixelLandscape(index, Modifier.fillMaxSize())
-                        if (award == null) Box(Modifier.fillMaxSize().background(Paper.copy(alpha = .36f)))
-                        Tag(if (award == null) "미수집 우표" else "수집 완료 · SIMULATED", if (award == null) White else Amber, Ink,
-                            Modifier.align(Alignment.BottomStart).padding(12.dp))
-                    }
-                    Column(Modifier.padding(10.dp)) {
-                        Text(route.title, color = Ink, fontSize = 23.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 16.dp), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(if (award == null) "${route.minutes}분 · 3개 지점을 모아 완성" else "${formatDate(award.timeMs)}  ·  가상 주행 기록", color = Muted, fontSize = 14.sp, modifier = Modifier.padding(top = 11.dp))
-                        Spacer(Modifier.height(24.dp))
-                        if (award == null) SecondaryButton("이 우표 만나러 가기  →", { onRoute(route) }, Modifier.fillMaxWidth())
-                        else PrimaryButton("우표 PNG 만들기  ↗", { onExport(route, award) }, Modifier.fillMaxWidth())
-                    }
-                }
-            }
-        }
-    }
-    Spacer(Modifier.height(28.dp))
-    NoteBlock("나의 여행 우표, 한 장으로 간직해요", "수집한 우표는 PNG로 만들어 앱 안에서 크게 볼 수 있어요. 가상 주행 기록이며 실제 방문 인증이나 사진이 아닙니다.")
-    if (awards.size > collected) {
-        Spacer(Modifier.height(24.dp))
-        Text("여정 기록 · ${awards.size}회", fontSize = 22.sp, color = Ink, fontWeight = FontWeight.Bold)
-        awards.reversed().forEach { award ->
-            val route = Catalog.routes.firstOrNull { it.id == award.routeId } ?: return@forEach
-            Row(Modifier.fillMaxWidth().padding(vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(formatDate(award.timeMs), color = Muted, fontFamily = Mono, modifier = Modifier.width(155.dp))
-                Text(route.title, Modifier.weight(1f), color = Ink, fontSize = 17.sp)
-                TextButton(onClick = { onExport(route, award) }) { Text("PNG 보기  ↗") }
-            }
-        }
-    }
-}
+@Composable internal fun AtlasPage(awards: List<Award>, onRoute: (Route) -> Unit, onExport: (Route, Award) -> Unit) =
+    DesignAtlas(awards, onRoute, onExport)
 
 @Composable internal fun SafetyPage(safety: Safety, trip: Trip?) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(42.dp)) {

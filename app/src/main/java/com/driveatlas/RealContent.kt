@@ -83,23 +83,5 @@ internal fun regionFor(route:Route)=when(route.id){"coast"->"강릉";"forest"->"
   }}
  }
 }
-@Composable internal fun RealDetailPage(route:Route,hasTrip:Boolean,onBack:()->Unit,onStart:()->Unit,onTrip:()->Unit){
- var sources by remember{mutableStateOf(false)}
- TextButton(onClick=onBack,contentPadding=PaddingValues(0.dp)){Text("←  모든 코스",fontSize=17.sp)}
- PageHeading("${regionFor(route)} / REAL ROAD COLLECTION",route.title,route.subtitle){SecondaryButton("출처·이용 안내",{sources=true})}
- Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(24.dp)){
-  Column(Modifier.weight(.61f)){
-   RealRoadMap(route,Modifier.fillMaxWidth().height(540.dp));Spacer(Modifier.height(16.dp))
-   RoadStats(route);Spacer(Modifier.height(16.dp))
-   NoteBlock("코스 미리보기","표시한 선은 실제 도로망을 따라 계산한 참고 경로입니다. 교통·통제와 현장 진입 조건은 반영하지 않아요. 도로 위 임의 정차를 유도하지 않습니다.")
-  }
-  Column(Modifier.weight(.39f)){
-   RoutePhoto(route,Modifier.fillMaxWidth().height(190.dp));PhotoAttribution(route)
-   route.stops.forEachIndexed{i,s->StopRow(i,s.name,false,false,if(route.id=="forest"&&i==2)"인근 도로 지점 · 나무길은 주차 후 산책" else "도로 기준점 · 주차장/정차 지점 보장 아님",i==2)}
-   Spacer(Modifier.height(18.dp));PrimaryButton("지도 연결 옵션  →",onStart,Modifier.fillMaxWidth())
-   if(hasTrip){Spacer(Modifier.height(10.dp));SecondaryButton("진행 중인 체험 보기",onTrip,Modifier.fillMaxWidth())}
-   Text("차량 P·UX 연동 / GPS는 별도 승인 / 실제 방문 인증 미구현",fontSize=13.sp,color=Muted,modifier=Modifier.padding(top=14.dp))
-  }
- }
- if(sources)SourcesDialog(route){sources=false}
-}
+@Composable internal fun RealDetailPage(route:Route,hasTrip:Boolean,onBack:()->Unit,onStart:()->Unit,onTrip:()->Unit) =
+ DesignDetail(route,hasTrip,onBack,onStart,onTrip)

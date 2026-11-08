@@ -1,0 +1,12 @@
+import importlib.util,time,json
+s=importlib.util.spec_from_file_location('q','tools/qa-real.py');q=importlib.util.module_from_spec(s);s.loader.exec_module(q);q.PKG='com.driveatlas.connected.emulator';q.OUT=q.Path('evidence/live-v05')
+q.expect('P · UX 해제 확인');q.expect('코스 살펴보기');q.snap('10-integrated-home');q.passed('Integrated redesigned home unlocks from actual emulator P/UX signals')
+q.tap('연결 상태 보기  +');q.expect('위치 권한 승인 전 · 읽지 않음');q.snap('11-integrated-connections');q.tap('연결 다시 확인');time.sleep(3);q.expect('기어 P · 주의분산 제한 false · UX 0');q.tap('닫기');q.expect('P · UX 해제 확인');q.passed('Reconnect rereads P/UX without manual safety override; location permission remains ungranted')
+q.tap('코스 살펴보기');q.expect('지도 연결 옵션');time.sleep(4);q.snap('12-integrated-map');q.passed('Real road geometry and licensed photo visible with redesigned detail')
+q.tap('출처·이용 안내');q.expect('출처와 이용 안내');q.tap('확인');q.tap('지도 연결 옵션');q.tap('기본 내비 화면 보기');time.sleep(4)
+time.sleep(15);root=q.ui();native=[n.attrib.get('text','') for n in root.iter('node') if n.attrib.get('package')=='ai.umos.maps.android.navigation.app'];assert native,'Native app did not become visible';q.snap('13-native-open');print('NATIVE TEXTS',native,flush=True);q.passed('Installed native navigation app actually visible via explicit app-open fallback')
+q.adb('shell','am','start','-n',q.PKG+'/com.driveatlas.MainActivity');time.sleep(3);q.expect('P · UX 해제 확인');q.snap('14-native-return');q.passed('Return from native app recovers verified parked state')
+q.adb('shell','am','force-stop',q.PKG);q.adb('shell','am','start','-n',q.PKG+'/com.driveatlas.MainActivity');time.sleep(3);q.expect('P · UX 해제 확인');q.expect('코스 살펴보기');q.passed('Cold restart automatically reconnects without a simulated unlock')
+q.tap('계절 드라이브');q.tap('겨울');q.expect('겨울에 어울리는 1개의 길');q.snap('15-winter');q.tap('춘천 의암호 서쪽길');q.tap('←  모든 코스');q.expect('겨울에 어울리는 1개의 길');q.passed('Season selection survives course detail and Back')
+q.tap('테마 드라이브');q.tap('초록 충전');q.snap('16-theme');q.tap('우표 도감');q.snap('17-atlas');q.tap('다녀온 길');q.snap('18-records');q.passed('Theme, stamp album, and visited-road pages render without granting GPS')
+q.tap('길 고르기');q.tap('추천길');q.snap('19-final-home');print('FINAL',q.texts(),flush=True)
