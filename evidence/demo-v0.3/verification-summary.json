@@ -1,0 +1,16 @@
+{
+  "version": "0.3.0-demo",
+  "package": "com.driveatlas.demo.simulator",
+  "unit_tests": 28,
+  "ui_checks": 14,
+  "lint_errors": 0,
+  "lint_warnings": 5,
+  "app_bounds": [
+    853,
+    90,
+    2535,
+    1300
+  ],
+  "apk_sha256": "99b6054f2ca8d4db602e971e15fbe2c3b82964739aceca1d48874c2fee5a0007",
+  "real_vehicle_integration": false
+}

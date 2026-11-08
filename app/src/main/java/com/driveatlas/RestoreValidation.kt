@@ -15,5 +15,6 @@ internal fun Snapshot.validatedForRestore(): Snapshot {
         award.tripId.isNotBlank() && award.timeMs >= 0 &&
             Catalog.routes.any { it.id == award.routeId }
     }
-    return copy(trip = restoredTrip, awards = restoredAwards)
+    val restoredVisits = visits.filter { v -> v.tripId.isNotBlank() && v.timeMs >= 0 && v.progress in 0..3 && Catalog.routes.any { it.id == v.routeId } }.distinctBy { it.tripId }
+    return copy(trip = restoredTrip, awards = restoredAwards.distinctBy { it.tripId }, visits = restoredVisits)
 }

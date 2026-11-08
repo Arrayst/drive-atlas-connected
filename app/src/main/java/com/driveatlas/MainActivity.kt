@@ -47,16 +47,16 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private val Ink = Color(0xFF203D38)
-private val Paper = Color(0xFFF5F1E7)
-private val White = Color(0xFFFFFDF7)
-private val Muted = Color(0xFF687970)
-private val Line = Color(0xFFD7DDCF)
-private val Sage = Color(0xFFE5EBDE)
-private val Amber = Color(0xFFF1BD63)
-private val Coral = Color(0xFFD97658)
-private val Mono = FontFamily.Monospace
-private val Corner = RoundedCornerShape(12.dp)
+internal val Ink = Color(0xFF203D38)
+internal val Paper = Color(0xFFF5F1E7)
+internal val White = Color(0xFFFFFDF7)
+internal val Muted = Color(0xFF687970)
+internal val Line = Color(0xFFD7DDCF)
+internal val Sage = Color(0xFFE5EBDE)
+internal val Amber = Color(0xFFF1BD63)
+internal val Coral = Color(0xFFD97658)
+internal val Mono = FontFamily.Monospace
+internal val Corner = RoundedCornerShape(12.dp)
 
 class MainActivity : ComponentActivity() {
     private lateinit var engine: AtlasEngine
@@ -79,24 +79,29 @@ class MainActivity : ComponentActivity() {
         revision++
     }
 
-    @Composable private fun AtlasApp() {
+    @Composable internal fun AtlasApp() {
         revision
         var page by remember { mutableStateOf("discover") }
         var selected by remember { mutableStateOf(Catalog.routes.first()) }
         var message by remember { mutableStateOf("") }
         var debug by remember { mutableStateOf(false) }
+        var curation by remember { mutableStateOf("recommended") }
+        var detailReturn by remember { mutableStateOf("curation") }
+        val filters = remember { GuideFilters() }
+        var navDialog by remember { mutableStateOf(false) }
+        var archiveDialog by remember { mutableStateOf(false) }
         var preview by remember { mutableStateOf<Bitmap?>(null) }
         val pageScroll = rememberScrollState()
         LaunchedEffect(page, selected.id) { pageScroll.scrollTo(0) }
-        LaunchedEffect(engine.canEdit) { if (!engine.canEdit) preview = null }
+        LaunchedEffect(engine.canEdit) { if (!engine.canEdit) { preview = null; navDialog = false; archiveDialog = false } }
         BackHandler(enabled = preview != null || debug || page != "discover") {
-            when { debug -> debug = false; preview != null -> preview = null; else -> page = "discover" }
+            when { debug -> debug = false; preview != null -> preview = null; else -> page = if (page == "detail") detailReturn else "discover" }
         }
         fun act(block: () -> Unit) {
             try { block() } catch (_: Exception) { message = "저장하지 못했어요. 주차 상태에서 다시 시도해 주세요." }
             revision++
         }
-        fun open(r: Route) { selected = r; page = "detail"; message = "" }
+        fun open(r: Route) { detailReturn = page; selected = r; page = "detail"; message = "" }
         BoxWithConstraints(Modifier.fillMaxSize().background(Paper)) {
             val wide = maxWidth >= 1100.dp
             val compact = maxHeight < 740.dp
@@ -109,12 +114,12 @@ class MainActivity : ComponentActivity() {
                     else Column(Modifier.fillMaxSize().verticalScroll(pageScroll)
                         .padding(horizontal = if (wide) 36.dp else 24.dp, vertical = 30.dp)) {
                         when (page) {
-                            "discover" -> DiscoverPage(engine.snapshot, heroHeight, ::open,
+                            "discover" -> GuideHome(engine.snapshot, { if (curation != it) filters.mood.value = if (it == "theme") "탁 트인" else "전체"; curation = it; page = "curation" },
                                 onTrip = { page = "trip" }, onAtlas = { page = "atlas" })
+                            "curation" -> CurationPage(curation, filters, engine.snapshot.awards, ::open, { page = "discover" })
+                            "records" -> RecordsPage(engine.snapshot, ::open)
                             "detail" -> DetailPage(selected, engine.snapshot.trip != null, heroHeight,
-                                onBack = { page = "discover" }, onStart = { act {
-                                    if (engine.start(selected.id, System.currentTimeMillis())) { page = "trip"; message = "가상 여정을 시작했어요." }
-                                } }, onTrip = { page = "trip" })
+                                onBack = { page = detailReturn }, onStart = { navDialog = true }, onTrip = { page = "trip" })
                             "trip" -> TripPage(engine.snapshot.trip, engine.location, heroHeight,
                                 onDiscover = { page = "discover" }, onEvidence = { act {
                                     engine.snapshot.trip?.let { t ->
@@ -126,7 +131,7 @@ class MainActivity : ComponentActivity() {
                                 } }, onFinish = { act {
                                     if (engine.finish(System.currentTimeMillis())) { page = "atlas"; message = "새로운 가상 여행 우표가 도감에 들어왔어요." }
                                     else message = "완료할 수 없어요. 위치 수신·주차 상태와 15초 이내 도착 근거가 필요해요."
-                                } }, onAbandon = { act { engine.abandon(); message = "여정을 종료했어요. 미완료 여정은 카드로 남지 않아요." } })
+                                } }, onAbandon = { archiveDialog = true })
                             "atlas" -> AtlasPage(engine.snapshot.awards, ::open, onExport = { r, a -> act {
                                 if (engine.canEdit) {
                                     val file = exportCard(r, a)
@@ -137,8 +142,8 @@ class MainActivity : ComponentActivity() {
                         }
                         Spacer(Modifier.height(26.dp))
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("가상 코스와 직접 그린 풍경으로 구성된 시뮬레이터 알파", color = Muted, fontSize = 13.sp)
-                            Text("DRIVE ATLAS / 01", color = Muted, fontFamily = Mono, fontSize = 12.sp)
+                            Text("가상 코스 · GPS/차량/내비 미연동 · 운전 중 조작 금지", color = Muted, fontSize = 13.sp)
+                            Text("DRIVE ATLAS / DEMO 03", color = Muted, fontFamily = Mono, fontSize = 12.sp)
                         }
                         Spacer(Modifier.height(if (message.isNotBlank()) 72.dp else 8.dp))
                     }
@@ -157,6 +162,12 @@ class MainActivity : ComponentActivity() {
             act { safety?.let(engine::setSafety); location?.let(engine::setLocation) }
             debug = false
             message = ""
+        }
+        if (engine.canEdit && navDialog) DemoNavigationDialog(selected, onDismiss = { navDialog = false }, onStart = {
+            act { if (engine.start(selected.id, System.currentTimeMillis())) { navDialog = false; page = "trip"; message = "내비 연결 성공을 체험했어요. 실제 내비는 실행하지 않았습니다." } }
+        })
+        if (engine.canEdit && archiveDialog) ArchiveDialog(onDismiss = { archiveDialog = false }) { status ->
+            act { if (engine.archive(status, System.currentTimeMillis())) { archiveDialog = false; page = "records"; message = "여행 기록만 남겼어요. 완주 우표는 발급하지 않았습니다." } }
         }
         if (engine.canEdit) preview?.let { bitmap -> PreviewDialog(bitmap) { preview = null } }
     }
@@ -212,15 +223,15 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@Composable private fun Sidebar(page: String, unlocked: Boolean, snapshot: Snapshot, wide: Boolean, compact: Boolean, onPage: (String) -> Unit, onDebug: () -> Unit) {
+@Composable internal fun Sidebar(page: String, unlocked: Boolean, snapshot: Snapshot, wide: Boolean, compact: Boolean, onPage: (String) -> Unit, onDebug: () -> Unit) {
     Column(Modifier.width(if (wide) 208.dp else 164.dp).fillMaxHeight().background(Ink).padding(20.dp)) {
         PixelIcon("car", Amber, Modifier.size(if (compact) 37.dp else 53.dp).padding(top = 6.dp))
         Spacer(Modifier.height(16.dp))
         Text("DRIVE\nATLAS", color = White, fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 27.sp, lineHeight = 30.sp, letterSpacing = 1.5.sp)
         if (!compact) Text("나의 여행 우표도감", color = Color(0xFFACBDA9), fontSize = 14.sp, modifier = Modifier.padding(top = 10.dp))
         Spacer(Modifier.height(if (compact) 20.dp else 45.dp))
-        listOf(Triple("discover", "길 발견", "compass"), Triple("trip", "현재 여정", "route"), Triple("atlas", "나의 도감", "book")).forEach { (id, title, icon) ->
-            val active = unlocked && (page == id || page == "detail" && id == "discover")
+        listOf(Triple("discover", "길 고르기", "compass"), Triple("records", "다녀온 길", "route"), Triple("atlas", "우표 도감", "book")).forEach { (id, title, icon) ->
+            val active = unlocked && (page == id || page in listOf("detail", "curation", "trip") && id == "discover")
             Row(Modifier.fillMaxWidth().height(if (compact) 60.dp else 78.dp).clip(Corner)
                 .background(if (active) Amber else Color.Transparent)
                 .clickable(enabled = unlocked) { onPage(id) }.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -228,11 +239,12 @@ class MainActivity : ComponentActivity() {
                 Spacer(Modifier.width(13.dp))
                 Column {
                     Text(title, color = if (active) Ink else Color(0xFFDCE5D7), fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                    if (id == "atlas") Text("${snapshot.awards.size.toString().padStart(2, '0')} STAMPS", color = if (active) Ink.copy(alpha = .65f) else Color(0xFF9EB39E), fontFamily = Mono, fontSize = 10.sp, modifier = Modifier.padding(top = 4.dp))
+                    if (id == "atlas") Text("${snapshot.awards.map { it.routeId }.distinct().size.toString().padStart(2, '0')} STAMPS", color = if (active) Ink.copy(alpha = .65f) else Color(0xFF9EB39E), fontFamily = Mono, fontSize = 10.sp, modifier = Modifier.padding(top = 4.dp))
                 }
             }
             Spacer(Modifier.height(10.dp))
         }
+        if (snapshot.trip != null) TextButton(onClick = { onPage("trip") }, enabled = unlocked, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) { Text("진행 중인 여정  →", color = Amber, fontSize = 15.sp) }
         Spacer(Modifier.weight(1f))
         Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0xFF456158)))
         Spacer(Modifier.height(22.dp))
@@ -241,14 +253,14 @@ class MainActivity : ComponentActivity() {
             Spacer(Modifier.width(8.dp))
             Text(if (unlocked) "가상 주차 상태" else "안전 확인 대기", color = White, fontSize = 13.sp)
         }
-        Text(if (BuildConfig.SIMULATOR) "SIMULATOR ALPHA" else "VEHICLE ALPHA", color = Color(0xFF91A58F), fontFamily = Mono, fontSize = 10.sp, modifier = Modifier.padding(top = 9.dp))
+        Text(if (BuildConfig.SIMULATOR) "SIMULATOR DEMO" else "VEHICLE UNVERIFIED", color = Color(0xFF91A58F), fontFamily = Mono, fontSize = 10.sp, modifier = Modifier.padding(top = 9.dp))
         if (BuildConfig.SIMULATOR) TextButton(onClick = onDebug, contentPadding = PaddingValues(0.dp), modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
             Text("시뮬레이터 제어  +", color = Color(0xFFC9D5C3), fontSize = 12.sp)
         }
     }
 }
 
-@Composable private fun PageHeading(eyebrow: String, title: String, subtitle: String, right: @Composable (() -> Unit)? = null) {
+@Composable internal fun PageHeading(eyebrow: String, title: String, subtitle: String, right: @Composable (() -> Unit)? = null) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Eyebrow(eyebrow)
@@ -260,7 +272,7 @@ class MainActivity : ComponentActivity() {
     Spacer(Modifier.height(27.dp))
 }
 
-@Composable private fun DiscoverPage(snapshot: Snapshot, heroHeight: androidx.compose.ui.unit.Dp, onRoute: (Route) -> Unit, onTrip: () -> Unit, onAtlas: () -> Unit) {
+@Composable internal fun DiscoverPage(snapshot: Snapshot, heroHeight: androidx.compose.ui.unit.Dp, onRoute: (Route) -> Unit, onTrip: () -> Unit, onAtlas: () -> Unit) {
     val coastCollected = snapshot.awards.any { it.routeId == "coast" }
     PageHeading("DRIVE PASSPORT / VOL. 01", "다음 우표는, 어느 길에서?", "작은 길 하나, 오래 간직할 여행 우표 한 장.") {
         Tag("가상 여행 가이드", Sage, Ink)
@@ -298,7 +310,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@Composable private fun StatusStrip(snapshot: Snapshot, onTrip: () -> Unit, onAtlas: () -> Unit) {
+@Composable internal fun StatusStrip(snapshot: Snapshot, onTrip: () -> Unit, onAtlas: () -> Unit) {
     Row(Modifier.fillMaxWidth().border(1.dp, Line, Corner).background(Sage.copy(alpha = .6f), Corner).padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
         PixelIcon(if (snapshot.trip == null) "route" else "car", Ink, Modifier.size(34.dp))
         Spacer(Modifier.width(17.dp))
@@ -314,7 +326,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@Composable private fun RouteCard(route: Route, index: Int, collected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+@Composable internal fun RouteCard(route: Route, index: Int, collected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Surface(onClick = onClick, modifier = modifier, color = White, shape = StampEdge, border = BorderStroke(1.dp, Line)) {
         Column(Modifier.padding(12.dp)) {
             Box {
@@ -338,7 +350,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@Composable private fun DetailPage(route: Route, hasTrip: Boolean, heroHeight: androidx.compose.ui.unit.Dp, onBack: () -> Unit, onStart: () -> Unit, onTrip: () -> Unit) {
+@Composable internal fun DetailPage(route: Route, hasTrip: Boolean, heroHeight: androidx.compose.ui.unit.Dp, onBack: () -> Unit, onStart: () -> Unit, onTrip: () -> Unit) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
         TextButton(onClick = onBack, contentPadding = PaddingValues(0.dp)) { Text("←  모든 코스", fontSize = 16.sp) }
         Tag("FIELD GUIDE  /  ${routeNumber(route)}", Sage, Ink)
@@ -376,7 +388,7 @@ class MainActivity : ComponentActivity() {
     NoteBlock("시연용으로 만든 길이에요", "코스와 지점은 모두 가상 데이터입니다. 실제 장소·운영시간·도로 상태를 안내하지 않습니다.")
 }
 
-@Composable private fun TripPage(trip: Trip?, location: LocationStatus, heroHeight: androidx.compose.ui.unit.Dp, onDiscover: () -> Unit, onEvidence: () -> Unit, onFinish: () -> Unit, onAbandon: () -> Unit) {
+@Composable internal fun TripPage(trip: Trip?, location: LocationStatus, heroHeight: androidx.compose.ui.unit.Dp, onDiscover: () -> Unit, onEvidence: () -> Unit, onFinish: () -> Unit, onAbandon: () -> Unit) {
     if (trip == null) {
         PageHeading("YOUR JOURNEY", "아직 펼치지 않은 여정", "마음이 가는 풍경에서 시작해 보세요.")
         Surface(color = White, shape = Corner, border = BorderStroke(1.dp, Line)) {
@@ -428,7 +440,7 @@ class MainActivity : ComponentActivity() {
                 Spacer(Modifier.height(11.dp))
                 PrimaryButton("주차 후 여정 완료  ✓", onFinish, Modifier.fillMaxWidth(), enabled = trip.nextStop == 3)
                 Text("완료하려면 15초 이내 도착 근거가 필요해요.\n오래되었다면 도착 위치를 다시 확인하세요.", color = Muted, fontSize = 13.sp, lineHeight = 20.sp, modifier = Modifier.padding(top = 12.dp))
-                TextButton(onClick = onAbandon, modifier = Modifier.padding(top = 10.dp)) { Text("여정 종료 · 카드 없이", color = Muted, fontSize = 14.sp) }
+                TextButton(onClick = onAbandon, modifier = Modifier.padding(top = 10.dp)) { Text("미확인·중단 기록 남기기", color = Muted, fontSize = 14.sp) }
             }
         }
     }
@@ -436,11 +448,11 @@ class MainActivity : ComponentActivity() {
     NoteBlock("운전할 때는 풍경보다 안전을 먼저", "이 화면은 실제 차량·GPS와 연결되지 않은 가상 여정입니다. 주행 상태이거나 차량 상태를 모르면 조작이 잠깁니다.")
 }
 
-@Composable private fun AtlasPage(awards: List<Award>, onRoute: (Route) -> Unit, onExport: (Route, Award) -> Unit) {
+@Composable internal fun AtlasPage(awards: List<Award>, onRoute: (Route) -> Unit, onExport: (Route, Award) -> Unit) {
     val collected = awards.map { it.routeId }.distinct().size
     PageHeading("TRAVEL STAMP ALBUM / VOL. 01", "차곡차곡, 나의 여행 우표", "지나온 길을 한 장씩 붙여 만드는 나만의 도감.") {
         Column(horizontalAlignment = Alignment.End) {
-            Text(awards.size.toString().padStart(2, '0'), fontSize = 44.sp, fontFamily = Mono, fontWeight = FontWeight.Bold, color = Ink)
+            Text(collected.toString().padStart(2, '0'), fontSize = 44.sp, fontFamily = Mono, fontWeight = FontWeight.Bold, color = Ink)
             Eyebrow("COLLECTED STAMPS")
         }
     }
@@ -500,7 +512,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@Composable private fun SafetyPage(safety: Safety, trip: Trip?) {
+@Composable internal fun SafetyPage(safety: Safety, trip: Trip?) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(42.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Eyebrow("SAFETY FIRST / DRIVE ATLAS")
@@ -538,12 +550,12 @@ class MainActivity : ComponentActivity() {
             Spacer(Modifier.height(25.dp))
         }
         NoteBlock("멈춰 있다고 주차 상태는 아니에요", "신호 대기나 속도 0만으로 잠금을 해제하지 않습니다. 차량 상태가 확인되지 않을 때도 안전을 위해 잠금을 유지합니다.")
-        Text(if (BuildConfig.SIMULATOR) "SIMULATOR ALPHA · 실제 차량 신호는 연결되지 않았습니다. 개발용 가상 상태는 왼쪽 아래에서 제어합니다."
-            else "VEHICLE ALPHA · 실차 어댑터가 연결되지 않아 주차 상태를 확인할 수 없습니다.", color = Muted, fontSize = 14.sp, lineHeight = 22.sp, modifier = Modifier.padding(top = 25.dp))
+        Text(if (BuildConfig.SIMULATOR) "SIMULATOR DEMO · 실제 차량 신호는 연결되지 않았습니다. 개발용 가상 상태는 왼쪽 아래에서 제어합니다."
+            else "VEHICLE UNVERIFIED · 실차 어댑터가 연결되지 않아 주차 상태를 확인할 수 없습니다.", color = Muted, fontSize = 14.sp, lineHeight = 22.sp, modifier = Modifier.padding(top = 25.dp))
     }
 }
 
-@Composable private fun StopRow(index: Int, title: String, done: Boolean, current: Boolean, subtitle: String, last: Boolean) {
+@Composable internal fun StopRow(index: Int, title: String, done: Boolean, current: Boolean, subtitle: String, last: Boolean) {
     Row(Modifier.fillMaxWidth().height(97.dp)) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Box(Modifier.size(42.dp).background(if (done) Ink else if (current) Amber else Sage, RoundedCornerShape(7.dp)), contentAlignment = Alignment.Center) {
@@ -559,7 +571,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@Composable private fun NoteBlock(title: String, body: String) {
+@Composable internal fun NoteBlock(title: String, body: String) {
     Row(Modifier.fillMaxWidth().border(1.dp, Line, Corner).padding(23.dp), verticalAlignment = Alignment.CenterVertically) {
         PixelIcon("spark", Coral, Modifier.size(30.dp))
         Spacer(Modifier.width(18.dp))
@@ -568,7 +580,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@Composable private fun DebugDialog(safety: Safety, location: LocationStatus, onDismiss: () -> Unit, onChange: (Safety?, LocationStatus?) -> Unit) {
+@Composable internal fun DebugDialog(safety: Safety, location: LocationStatus, onDismiss: () -> Unit, onChange: (Safety?, LocationStatus?) -> Unit) {
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(Modifier.widthIn(max = 670.dp).heightIn(max = 680.dp).padding(24.dp), color = Paper, shape = Corner) {
             Column(Modifier.verticalScroll(rememberScrollState()).padding(30.dp)) {
@@ -591,7 +603,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@Composable private fun PreviewDialog(bitmap: Bitmap, onDismiss: () -> Unit) {
+@Composable internal fun PreviewDialog(bitmap: Bitmap, onDismiss: () -> Unit) {
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(Modifier.fillMaxWidth(.82f).fillMaxHeight(.92f), color = Paper, shape = Corner) {
             Column(Modifier.padding(26.dp)) {
@@ -608,19 +620,19 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@Composable private fun Eyebrow(text: String) { Text(text, color = Muted, fontFamily = Mono, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp) }
-@Composable private fun Tag(text: String, background: Color, foreground: Color, modifier: Modifier = Modifier) {
+@Composable internal fun Eyebrow(text: String) { Text(text, color = Muted, fontFamily = Mono, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp) }
+@Composable internal fun Tag(text: String, background: Color, foreground: Color, modifier: Modifier = Modifier) {
     Text(text, modifier.background(background, RoundedCornerShape(4.dp)).padding(horizontal = 11.dp, vertical = 7.dp), color = foreground, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = .3.sp)
 }
-@Composable private fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
+@Composable internal fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
     Button(onClick = onClick, enabled = enabled, modifier = modifier.heightIn(min = 57.dp), shape = RoundedCornerShape(7.dp), contentPadding = PaddingValues(horizontal = 20.dp, vertical = 13.dp), colors = ButtonDefaults.buttonColors(containerColor = Ink, contentColor = White, disabledContainerColor = Sage, disabledContentColor = Muted)) {
         Text(text, fontSize = 17.sp, fontWeight = FontWeight.Bold)
     }
 }
-@Composable private fun SecondaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+@Composable internal fun SecondaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
     OutlinedButton(onClick = onClick, modifier = modifier.heightIn(min = 56.dp), shape = RoundedCornerShape(7.dp), border = BorderStroke(1.dp, Line), contentPadding = PaddingValues(horizontal = 17.dp, vertical = 13.dp)) { Text(text, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Ink) }
 }
-@Composable private fun PixelIcon(name: String, color: Color, modifier: Modifier = Modifier) {
+@Composable internal fun PixelIcon(name: String, color: Color, modifier: Modifier = Modifier) {
     val rows = when (name) {
         "car" -> listOf("  #######   ", " ##     ##  ", "##  ##   ###", "############", "###      ###", " ##      ## ")
         "compass" -> listOf("    #    ", "  #####  ", " ## # ## ", "##  #  ##", "#########", "##  #  ##", " ## # ## ", "  #####  ", "    #    ")
@@ -637,12 +649,12 @@ class MainActivity : ComponentActivity() {
         rows.forEachIndexed { y, row -> row.forEachIndexed { x, c -> if (c == '#') drawRect(color, Offset(left + x * unit, top + y * unit), Size(unit + .1f, unit + .1f)) } }
     }
 }
-private fun routeNumber(route: Route) = "0${Catalog.routes.indexOf(route) + 1}"
-private fun routeKind(route: Route) = when (route.id) { "coast" -> "COASTLINE"; "forest" -> "FOREST"; else -> "LAKESIDE" }
-private fun formatDate(timeMs: Long) = SimpleDateFormat("yyyy.MM.dd", Locale.KOREA).format(Date(timeMs))
+internal fun routeNumber(route: Route) = "0${Catalog.routes.indexOf(route) + 1}"
+internal fun routeKind(route: Route) = when (route.id) { "coast" -> "COASTLINE"; "forest" -> "FOREST"; else -> "LAKESIDE" }
+internal fun formatDate(timeMs: Long) = SimpleDateFormat("yyyy.MM.dd", Locale.KOREA).format(Date(timeMs))
 
 /** Perforated paper edge, shared by available and collected travel stamps. */
-private val StampEdge = object : Shape {
+internal val StampEdge = object : Shape {
     override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
         val radius = with(density) { 3.5.dp.toPx() }
         val step = with(density) { 18.dp.toPx() }

@@ -18,7 +18,9 @@ object Catalog {
 data class Evidence(val point: Point, val accuracyM: Double, val timeMs: Long, val simulated: Boolean)
 data class Trip(val id: String, val routeId: String, val startedMs: Long, val nextStop: Int = 0, val lastEvidenceMs: Long = 0, val mode: Mode = Mode.SIMULATOR)
 data class Award(val tripId: String, val routeId: String, val simulated: Boolean, val timeMs: Long)
-data class Snapshot(val trip: Trip? = null, val awards: List<Award> = emptyList())
+enum class VisitStatus { UNCONFIRMED, INTERRUPTED }
+data class Visit(val tripId: String, val routeId: String, val simulated: Boolean, val timeMs: Long, val progress: Int, val status: VisitStatus)
+data class Snapshot(val trip: Trip? = null, val awards: List<Award> = emptyList(), val visits: List<Visit> = emptyList())
 interface AtlasStore { fun load(): Snapshot; fun save(snapshot: Snapshot) }
 /** Real integrations must supply fresh location evidence and authoritative parked/gear state.
  * Neither speed=0 nor a stoplight is evidence of PARKED. No real adapter is enabled in this alpha. */
@@ -52,7 +54,13 @@ class AtlasEngine(private val store: AtlasStore, val mode: Mode) {
   if (t.mode != mode) return false
   val count = Catalog.routes.first { it.id == t.routeId }.stops.size
   if (!canEdit || location != LocationStatus.AVAILABLE || t.nextStop != count || now < t.lastEvidenceMs || now-t.lastEvidenceMs > 15000 || snapshot.awards.any { it.tripId == t.id }) return false
-  update(Snapshot(null, snapshot.awards + Award(t.id, t.routeId, mode == Mode.SIMULATOR, now)))
+  update(snapshot.copy(trip = null, awards = snapshot.awards + Award(t.id, t.routeId, mode == Mode.SIMULATOR, now)))
+  return true
+ }
+ fun archive(status: VisitStatus, now: Long): Boolean {
+  val t = snapshot.trip ?: return false
+  if (!canEdit || t.mode != mode || now < t.startedMs) return false
+  update(snapshot.copy(trip = null, visits = snapshot.visits + Visit(t.id, t.routeId, mode == Mode.SIMULATOR, now, t.nextStop, status)))
   return true
  }
  fun abandon(): Boolean { if (!canEdit) return false; update(snapshot.copy(trip = null)); return true }

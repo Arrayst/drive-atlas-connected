@@ -1,0 +1,16 @@
+[
+  "Home has 3 entry points inside 1682x1210 app bounds",
+  "Winter filter and detail Back preserve conditions",
+  "Mood filter chooses the forest course",
+  "Empty region, reset and explicit sample-nearby sorting",
+  "Navigation failure/cancel does not start a journey",
+  "Lost location rejects simulated evidence; restored location accepts it",
+  "Restart preserves journey progress but resets safety/location",
+  "Complete journey, course stamp, PNG preview and Back",
+  "Visited map and list show completion",
+  "Repeat journey adds record without a second course stamp",
+  "Partial journey archived without a stamp",
+  "Archive Cancel keeps journey; interrupted record grants no stamp",
+  "Moving state blocks navigation and album editing",
+  "Return to home with persisted demo records"
+]
