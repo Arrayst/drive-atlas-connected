@@ -107,64 +107,46 @@ private val CardShape = RoundedCornerShape(18.dp)
 }
 
 @Composable internal fun DesignHome(snapshot:Snapshot,onCategory:(String)->Unit,onTrip:()->Unit,onAtlas:()->Unit,onRoute:(Route)->Unit,filters:GuideFilters) {
- var mode by filters.homeMode
- var season by filters.season
- var mood by filters.mood
- DesignTitle("길 고르기","좋은 풍경이 있는 길, 출발 전에 골라보세요.") {Row(verticalAlignment=Alignment.CenterVertically){AtlasSymbol("pin",Muted,Modifier.size(22.dp));Text("강릉 · 담양 · 춘천",color=Muted,fontSize=16.sp,modifier=Modifier.padding(start=8.dp))}}
+ DesignTitle("어떤 길로 떠날까요?","큰 카드에서 고르고, 안에서 나에게 맞는 코스를 찾아보세요.")
+ Spacer(Modifier.height(34.dp))
+ val categories=listOf(
+  Triple("recommended","추천길","가족·연인과 함께하기 좋은\n드라이브 코스를 골라보세요."),
+  Triple("season","계절 드라이브","봄부터 겨울까지,\n지금 계절의 풍경을 찾아요."),
+  Triple("theme","테마 드라이브","바다·숲·호수 중,\n오늘 마음에 드는 풍경으로.")
+ )
+ Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(24.dp)) {
+  categories.forEachIndexed { index,(id,title,description) ->
+   val photo=Catalog.routes[index]
+   Surface(onClick={onCategory(id)},color=White,shape=RoundedCornerShape(22.dp),modifier=Modifier.weight(1f).height(650.dp)) {
+    Column {
+     Box(Modifier.fillMaxWidth().height(300.dp)) {
+      RoutePhoto(photo,Modifier.fillMaxSize())
+      Box(Modifier.align(Alignment.TopStart).padding(22.dp).size(52.dp).background(White.copy(alpha=.94f),RoundedCornerShape(14.dp)),contentAlignment=Alignment.Center) {
+       AtlasSymbol(when(id){"recommended"->"explore";"season"->"clock";else->"roads"},AtlasGreen,Modifier.size(30.dp))
+      }
+     }
+     Column(Modifier.weight(1f).padding(horizontal=28.dp,vertical=25.dp)) {
+      Text(title,color=Ink,fontSize=32.sp,fontWeight=FontWeight.Bold,letterSpacing=(-.7).sp)
+      Text(description,color=Muted,fontSize=20.sp,lineHeight=31.sp,modifier=Modifier.padding(top=15.dp))
+      Spacer(Modifier.weight(1f))
+      Row(Modifier.fillMaxWidth().heightIn(min=64.dp),verticalAlignment=Alignment.CenterVertically) {
+       Text("코스 목록 보기",color=AtlasGreen,fontSize=20.sp,fontWeight=FontWeight.SemiBold,modifier=Modifier.weight(1f))
+       Box(Modifier.size(54.dp).background(AtlasSoft,RoundedCornerShape(14.dp)),contentAlignment=Alignment.Center){AtlasSymbol("arrow",AtlasGreen,Modifier.size(27.dp))}
+      }
+      PhotoCreditLine(photo)
+     }
+    }
+   }
+  }
+ }
  Spacer(Modifier.height(28.dp))
- Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-  Row(Modifier.weight(1f),horizontalArrangement=Arrangement.spacedBy(10.dp)) {
-   listOf("recommended" to "추천길","season" to "계절 드라이브","theme" to "테마 드라이브").forEach { (id,label) ->
-    Surface(onClick={mode=id},color=if(mode==id)AtlasDark else Color.Transparent,shape=RoundedCornerShape(12.dp)) {
-     Text(label,fontSize=20.sp,fontWeight=FontWeight.SemiBold,color=if(mode==id)Color.White else Muted,modifier=Modifier.padding(horizontal=24.dp,vertical=18.dp))
-    }
-   }
+ Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(AtlasSoft).padding(horizontal=24.dp,vertical=18.dp),verticalAlignment=Alignment.CenterVertically) {
+  AtlasSymbol(if(snapshot.trip!=null)"roads" else "stamp",AtlasGreen,Modifier.size(30.dp));Spacer(Modifier.width(18.dp))
+  Column(Modifier.weight(1f)) {
+   Text(if(snapshot.trip!=null)"진행 중인 여정이 있어요" else "선택은 주차 중에, 풍경은 안전하게",color=Ink,fontSize=20.sp,fontWeight=FontWeight.SemiBold)
+   Text(if(snapshot.trip!=null)"저장해 둔 체험을 이어갈 수 있어요." else "코스를 고른 뒤 지도와 내비 연결 옵션을 확인하세요.",color=Muted,fontSize=16.sp,modifier=Modifier.padding(top=6.dp))
   }
-  TextButton(onClick={onCategory(mode)},modifier=Modifier.heightIn(min=64.dp)) { AtlasSymbol("filter",Ink,Modifier.size(22.dp));Spacer(Modifier.width(10.dp));Text("지역·조건",color=Ink,fontSize=17.sp) }
- }
- Spacer(Modifier.height(24.dp))
- if(mode=="season") {ChoiceRow("계절",listOf("봄","여름","가을","겨울"),season){season=it};Spacer(Modifier.height(18.dp))}
- if(mode=="theme") {ChoiceRow("분위기",listOf("전체","탁 트인","잔잔한","초록 충전"),mood){mood=it};Spacer(Modifier.height(18.dp))}
- val routes=filteredRoutes(mode,season,mood,"전체",false)
- if(mode=="recommended") {
-  val coast=Catalog.routes.first()
-  Surface(color=White,shape=CardShape,modifier=Modifier.fillMaxWidth()) {
-   Row(Modifier.height(388.dp)) {
-    Column(Modifier.weight(.43f).fillMaxHeight().padding(30.dp),verticalArrangement=Arrangement.SpaceBetween) {
-     SmallPill("바다를 따라 달리는 길")
-     Column {
-      Text("강릉 헌화로",color=Ink,fontSize=42.sp,fontWeight=FontWeight.Bold,letterSpacing=(-1.5).sp)
-      Text("금진항에서 정동진까지,\n창밖으로 이어지는 동해.",color=Muted,fontSize=20.sp,lineHeight=31.sp,modifier=Modifier.padding(top=12.dp))
-     }
-     Column {
-      InlineStats(coast,large=true)
-      Text("OSRM 주행 추정 · 정차·교통 제외",color=Muted,fontSize=13.sp,modifier=Modifier.padding(top=8.dp,bottom=20.dp))
-      Button(onClick={onRoute(coast)},shape=RoundedCornerShape(12.dp),colors=ButtonDefaults.buttonColors(containerColor=AtlasGreen),contentPadding=PaddingValues(horizontal=25.dp),modifier=Modifier.height(64.dp)) {Text("코스 살펴보기",fontSize=19.sp,fontWeight=FontWeight.Bold);Spacer(Modifier.width(35.dp));AtlasSymbol("arrow",Color.White,Modifier.size(25.dp))}
-     }
-    }
-    Box(Modifier.weight(.57f).fillMaxHeight()) {
-     RoutePhoto(coast,Modifier.fillMaxSize())
-     Text("정동진 해변 · 코스 인근 풍경",color=Color.White,fontSize=14.sp,modifier=Modifier.align(Alignment.TopStart).padding(20.dp).background(Color.Black.copy(alpha=.48f),RoundedCornerShape(7.dp)).padding(10.dp))
-     Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().background(Color.Black.copy(alpha=.40f)).padding(horizontal=18.dp)) {PhotoCreditLine(coast,onDark=true)}
-    }
-   }
-  }
-  Spacer(Modifier.height(27.dp))
-  Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {Text("다른 풍경도 만나보세요",color=Ink,fontSize=25.sp,fontWeight=FontWeight.Bold,modifier=Modifier.weight(1f));Text("실제 도로 경로 3개",fontSize=15.sp,color=Muted)}
-  Spacer(Modifier.height(18.dp))
-  Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(20.dp)) {
-   Catalog.routes.drop(1).forEach { r -> CompactRoadCard(r,Modifier.weight(1f)){onRoute(r)} }
-  }
- } else {
-  Text(if(mode=="season")"${season}에 어울리는 ${routes.size}개의 길" else "${if(mood=="전체")"기분 따라 고르는" else mood} ${routes.size}개의 길",color=Ink,fontSize=26.sp,fontWeight=FontWeight.Bold)
-  Spacer(Modifier.height(20.dp))
-  Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(20.dp)){routes.forEach { r-> PhotoRoadCard(r,Modifier.weight(1f),snapshot.awards.any{it.routeId==r.id}){onRoute(r)} };if(routes.size==1)Spacer(Modifier.weight(1f))}
- }
- Spacer(Modifier.height(26.dp))
- Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(AtlasSoft).padding(horizontal=22.dp,vertical=14.dp),verticalAlignment=Alignment.CenterVertically) {
-  AtlasSymbol(if(snapshot.trip!=null)"roads" else "stamp",AtlasGreen,Modifier.size(29.dp));Spacer(Modifier.width(16.dp))
-  Column(Modifier.weight(1f)) {Text(if(snapshot.trip!=null)"진행 중인 여정이 있어요" else "좋았던 길은 우표로 남겨요",color=Ink,fontSize=18.sp,fontWeight=FontWeight.SemiBold);Text(if(snapshot.trip!=null)"주차한 상태에서 체험을 이어갈 수 있어요." else "${snapshot.awards.map{it.routeId}.distinct().size} / 3종 수집 · 모의 방문 기록",color=Muted,fontSize=14.sp,modifier=Modifier.padding(top=5.dp))}
-  TextButton(onClick=if(snapshot.trip!=null)onTrip else onAtlas,modifier=Modifier.heightIn(min=56.dp)){Text(if(snapshot.trip!=null)"여정 이어보기" else "우표 도감",color=AtlasGreen,fontSize=17.sp,fontWeight=FontWeight.Bold);Spacer(Modifier.width(14.dp));AtlasSymbol("arrow",AtlasGreen,Modifier.size(22.dp))}
+  TextButton(onClick=if(snapshot.trip!=null)onTrip else onAtlas,modifier=Modifier.heightIn(min=64.dp)){Text(if(snapshot.trip!=null)"여정 이어보기" else "우표 도감",color=AtlasGreen,fontSize=18.sp,fontWeight=FontWeight.Bold);Spacer(Modifier.width(14.dp));AtlasSymbol("arrow",AtlasGreen,Modifier.size(24.dp))}
  }
 }
 

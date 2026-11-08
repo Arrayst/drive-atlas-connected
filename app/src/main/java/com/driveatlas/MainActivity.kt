@@ -110,7 +110,8 @@ class MainActivity : ComponentActivity() {
         var debug by remember { mutableStateOf(false) }
         var curation by remember { mutableStateOf("recommended") }
         var detailReturn by remember { mutableStateOf("curation") }
-        val filters = remember { GuideFilters() }
+        val categoryFilters = remember { listOf("recommended", "season", "theme").associateWith { GuideFilters() } }
+        val filters = categoryFilters.getValue(curation)
         var navDialog by remember { mutableStateOf(false) }
         var archiveDialog by remember { mutableStateOf(false) }
         var preview by remember { mutableStateOf<Bitmap?>(null) }
@@ -166,7 +167,7 @@ class MainActivity : ComponentActivity() {
                         Spacer(Modifier.height(26.dp))
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text("실제 장소·지도 · 방문/주행은 모의 체험 · 운전 중 조작 금지", color = Muted, fontSize = 13.sp)
-                            Text("DRIVE ATLAS / CONNECTED 05", color = Muted, fontFamily = Mono, fontSize = 12.sp)
+                            Text("DRIVE ATLAS / CARDS + GPS 06", color = Muted, fontFamily = Mono, fontSize = 12.sp)
                         }
                         Spacer(Modifier.height(if (message.isNotBlank()) 72.dp else 8.dp))
                     }

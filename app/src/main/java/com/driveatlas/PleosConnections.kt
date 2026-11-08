@@ -26,6 +26,7 @@ internal data class ConnectionState(
     val navigation: String = "내비 서비스 연결 대기",
     val location: String = "위치 권한 승인 전 · 읽지 않음",
     val coordinates: String? = null,
+    val visitCheck: String? = null,
     val emulator: Boolean = Build.HARDWARE == "ranchu" || Build.HARDWARE == "goldfish"
 )
 
@@ -81,10 +82,10 @@ internal class PleosConnections(private val context: Context, private val change
         refreshVehicle()
         if (fused != null && context.checkSelfPermission(LOCATION_PERMISSION) != PackageManager.PERMISSION_GRANTED) {
             disconnectLocation()
-            publish(state.copy(location = "위치 권한 없음 · 읽지 않음", coordinates = null))
+            publish(state.copy(location = "위치 권한 없음 · 읽지 않음", coordinates = null, visitCheck = null))
         }
         if (locationReceivedAt > 0 && SystemClock.elapsedRealtime() - locationReceivedAt > 15_000) {
-            publish(state.copy(location = "위치 콜백 15초 이상 없음 · 오래된 값 사용 안 함", coordinates = null))
+            publish(state.copy(location = "위치 콜백 15초 이상 없음 · 오래된 값 사용 안 함", coordinates = null, visitCheck = null))
         }
         handler.postDelayed(this, 2000)
     } }
@@ -161,7 +162,7 @@ internal class PleosConnections(private val context: Context, private val change
         runCatching { car?.disconnect() }
         car = null; property = null; ux = null; gear = null; requiresDo = null; restrictions = null
         disconnectLocation()
-        publish(state.copy(safety = Safety.UNKNOWN, vehicle = "화면 복귀 시 차량 신호 다시 확인", coordinates = null))
+        publish(state.copy(safety = Safety.UNKNOWN, vehicle = "화면 복귀 시 차량 신호 다시 확인", coordinates = null, visitCheck = null))
     }
     fun retry() {
         stop()
@@ -268,19 +269,20 @@ internal class PleosConnections(private val context: Context, private val change
         override fun onChanged(location: LocationData?) { post {
             if (!active || generation != expectedGeneration || context.checkSelfPermission(LOCATION_PERMISSION) != PackageManager.PERMISSION_GRANTED) return@post
             if (location == null || !location.latitude.isFinite() || !location.longitude.isFinite() || location.latitude !in -90.0..90.0 || location.longitude !in -180.0..180.0) {
-                publish(state.copy(location = "유효한 위치가 아직 없음", coordinates = null)); return@post
+                publish(state.copy(location = "유효한 위치가 아직 없음", coordinates = null, visitCheck = null)); return@post
             }
             locationReceivedAt = SystemClock.elapsedRealtime()
             // Receipt freshness only; the SDK timestamp clock/accuracy are not documented.
-            publish(state.copy(location = "위치 콜백 수신 · 정확도(m) 미제공 · 방문 인증 사용 안 함",
-                coordinates = String.format(java.util.Locale.US, "%.5f, %.5f · confidence %.2f", location.latitude, location.longitude, location.confidence)))
+            publish(state.copy(location = "${if(state.emulator) "에뮬레이터" else "SDK"} 위치 수신 · 정확도(m) 미제공 · 실제 방문 인증 아님",
+                coordinates = String.format(java.util.Locale.US, "SDK 좌표 %.5f, %.5f", location.latitude, location.longitude),
+                visitCheck = localCourseSummary(Point(location.latitude, location.longitude))))
         } }
-        override fun onError(exception: Exception) { post { if (active && generation == expectedGeneration) publish(state.copy(location = "위치 SDK 오류: ${exception.javaClass.simpleName}", coordinates = null)) } }
+        override fun onError(exception: Exception) { post { if (active && generation == expectedGeneration) publish(state.copy(location = "위치 SDK 오류: ${exception.javaClass.simpleName}", coordinates = null, visitCheck = null)) } }
     }
     fun connectLocationIfGranted() {
         if (!active || fused != null) return
         if (context.checkSelfPermission(LOCATION_PERMISSION) != PackageManager.PERMISSION_GRANTED) {
-            publish(state.copy(location = "위치 권한 승인 전 · 읽지 않음", coordinates = null)); return
+            publish(state.copy(location = "위치 권한 승인 전 · 읽지 않음", coordinates = null, visitCheck = null)); return
         }
         try {
             val service = FusedLocation(context)
@@ -290,7 +292,7 @@ internal class PleosConnections(private val context: Context, private val change
             locationListener = listener
             service.initialize(); service.registerFusedLocationCallback(listener); service.getLastKnownLocation(listener)
             publish(state.copy(location = "위치 권한 허용 · SDK 콜백 대기"))
-        } catch (error: Exception) { disconnectLocation(); publish(state.copy(location = "위치 연결 실패: ${error.javaClass.simpleName}", coordinates = null)) }
+        } catch (error: Exception) { disconnectLocation(); publish(state.copy(location = "위치 연결 실패: ${error.javaClass.simpleName}", coordinates = null, visitCheck = null)) }
     }
     private fun disconnectLocation() {
         runCatching { if (context.checkSelfPermission(LOCATION_PERMISSION) == PackageManager.PERMISSION_GRANTED) locationListener?.let { fused?.unregisterFusedLocationCallback(it) } }
