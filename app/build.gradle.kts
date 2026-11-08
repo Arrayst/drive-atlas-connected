@@ -6,7 +6,7 @@ plugins {
 android {
  namespace = "com.driveatlas"
  compileSdk = 35
- defaultConfig { applicationId = "com.driveatlas.demo"; minSdk = 28; targetSdk = 35; versionCode = 3; versionName = "0.3.0-demo" }
+ defaultConfig { applicationId = "com.driveatlas.real"; minSdk = 28; targetSdk = 35; versionCode = 4; versionName = "0.4.0-real-roads" }
  buildTypes { debug { applicationIdSuffix = ".simulator"; buildConfigField("boolean", "SIMULATOR", "true") }; release { buildConfigField("boolean", "SIMULATOR", "false") } }
  compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
  kotlinOptions { jvmTarget = "17" }

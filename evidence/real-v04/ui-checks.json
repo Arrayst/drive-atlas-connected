@@ -1,0 +1,16 @@
+[
+  "Real location photos and 3 categories visible inside app bounds",
+  "Coast real road geometry and attribution visible; OSM tile load verified in logs",
+  "Explicit offline simulation and retry restore cached map without fake blank-map route",
+  "User zoom and fit controls respond",
+  "Source and license dialog dismisses back to same route",
+  "Map options cancel does not start or award a journey",
+  "External web map returns to fail-closed safety lock without starting a journey",
+  "Lake map loads with real road geometry; winter filter survives detail Back",
+  "Damyang map renders neighboring public roads with walking attraction clearly separated",
+  "Simulated evidence, complete, stamp and PNG preview work with real-place catalog",
+  "Record persists after process restart; safety does not persist unlocked",
+  "Archive cancel and incomplete visit preserve correct state without extra stamp",
+  "Moving simulation blocks editing",
+  "Final app left on real coast map; all screenshots use the actual PLEOS window"
+]

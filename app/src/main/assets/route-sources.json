@@ -1,0 +1,342 @@
+{
+  "created_at_utc": "2026-11-08T01:54:34.917286+00:00",
+  "coordinate_order": "longitude,latitude",
+  "routing_provider": "OSRM public demo server",
+  "routing_profile": "driving",
+  "osm_attribution": "© OpenStreetMap contributors",
+  "osm_license": "https://www.openstreetmap.org/copyright",
+  "not_live_navigation": true,
+  "distance_duration_note": "OSRM static route snapshot estimates. No current traffic, closures, weather, or parking access verification.",
+  "routes": {
+    "coast": {
+      "title": "강릉 헌화로",
+      "points": [
+        [
+          129.0516881,
+          37.652838
+        ],
+        [
+          129.0546272,
+          37.6642503
+        ],
+        [
+          129.0315582,
+          37.6906013
+        ]
+      ],
+      "labels": [
+        "금진항 앞 헌화로",
+        "심곡항 앞 해안 헌화로",
+        "정동진 해변 인근 헌화로"
+      ],
+      "ways": [
+        455119665,
+        455119665,
+        183531441
+      ],
+      "sources": [
+        "https://korean.visitkorea.or.kr/detail/rem_detail.do?cotid=e9c74637-7df6-4ade-b2c1-0868c09a06d7"
+      ],
+      "note": "바다부채길은 도보 탐방로이며 자동차 경로가 아님. 도로상 샘플 지점이며 주차 위치를 보증하지 않음.",
+      "request_url": "https://router.project-osrm.org/route/v1/driving/129.0516881,37.652838;129.0546272,37.6642503;129.0315582,37.6906013?overview=full&geometries=geojson&steps=false",
+      "route_file": "coast-route.json",
+      "distance_m": 6254.6,
+      "duration_s": 580.9,
+      "geometry_points": 440,
+      "road_sources": [
+        "https://www.openstreetmap.org/way/455119665",
+        "https://www.openstreetmap.org/way/455119665",
+        "https://www.openstreetmap.org/way/183531441"
+      ],
+      "snapped_waypoints": [
+        {
+          "hint": "cOyVgRdxmYOkAAAAAAAAAOIFAAAAAAAATVI2QwAAAAAMF9BEAAAAAKQAAAAAAAAA4gUAAAAAAAA7cAAAKCyxB2aJPgIoLLEHZok-AmgB_w8AAAAAK-yVgRZxmYPDAAAAAAAAAB8AAAAAAAAADwBZQwAAAADevwtCAAAAAMMAAAAAAAAAHwAAAAAAAAA7cAAAKCyxB2aJPgIoLLEHZok-AggAvwQAAAAAGHGZgxtxmYMAAAAAeQAAAAAAAADTAgAAAAAAAHGOp0IAAAAA8sz6QwAAAAB5AAAAAAAAANMCAAA7cAAAKCyxB2aJPgIoLLEHZok-AgAAbxUAAAAA",
+          "location": [
+            129.051688,
+            37.652838
+          ],
+          "name": "헌화로 (동해안 자전거길) / 헌화로 (동해안 자전거길)",
+          "distance": 0
+        },
+        {
+          "hint": "cOyVgRdxmYMQAAAAAAAAAJAAAADmBQAAEc-JQQAAAACyqx1DpATRRBAAAAAAAAAAkAAAAOYFAAA7cAAAozexB_q1PgKjN7EH-rU-AiAAHwsAAAAA",
+          "location": [
+            129.054627,
+            37.66425
+          ],
+          "name": "헌화로 (동해안 자전거길)",
+          "distance": 0
+        },
+        {
+          "hint": "spgwgKDslYEAAAAADwAAAAAAAAANAAAAAAAAAO6DgkEAAAAAweJkQQAAAAAPAAAAAAAAAA0AAAA7cAAAht2wB-kcPwKG3bAH6Rw_AgAA_wYAAAAAs5gwgHvtlYEAAAAAFQAAAAAAAAAWAQAAAAAAAAXBuEEAAAAAiJ2aQwAAAAAVAAAAAAAAABYBAAA7cAAAht2wB-kcPwKG3bAH6Rw_AgAAXwsAAAAAsZgwgLWNmoEAAAAAMgAAAAAAAABrAAAAAAAAAOBsXUIAAAAAa0DvQgAAAAAyAAAAAAAAAGsAAAA7cAAAht2wB-kcPwKG3bAH6Rw_AgAA_xUAAAAA",
+          "location": [
+            129.031558,
+            37.690601
+          ],
+          "name": "헌화로 / 율곡로 / 율곡로",
+          "distance": 0
+        }
+      ],
+      "kakao_driving_url": "https://map.kakao.com/link/by/car/%EA%B8%88%EC%A7%84%ED%95%AD%20%EC%95%9E%20%ED%97%8C%ED%99%94%EB%A1%9C,37.652838,129.0516881/%EC%8B%AC%EA%B3%A1%ED%95%AD%20%EC%95%9E%20%ED%95%B4%EC%95%88%20%ED%97%8C%ED%99%94%EB%A1%9C,37.6642503,129.0546272/%EC%A0%95%EB%8F%99%EC%A7%84%20%ED%95%B4%EB%B3%80%20%EC%9D%B8%EA%B7%BC%20%ED%97%8C%ED%99%94%EB%A1%9C,37.6906013,129.0315582"
+    },
+    "forest": {
+      "title": "담양 메타길 나들이",
+      "points": [
+        [
+          126.9854786,
+          35.3240329
+        ],
+        [
+          126.99192,
+          35.3167139
+        ],
+        [
+          127.0022261,
+          35.3230071
+        ]
+      ],
+      "labels": [
+        "관방제림 남쪽 죽녹원로",
+        "담양88로 경유",
+        "메타프로방스·메타길 인근 담양88로"
+      ],
+      "ways": [
+        36163364,
+        1305352727,
+        1305352727
+      ],
+      "sources": [
+        "https://korean.visitkorea.or.kr/detail/rem_detail.do?cotid=6cc24bf9-6eb3-43f4-9527-468f4769c88c",
+        "https://korean.visitkorea.or.kr/detail/ms_detail.do?cotid=6e6fad62-1c2a-43ec-8cd9-760e662d8fc7"
+      ],
+      "note": "메타세쿼이아 가로수길은 산책 명소. 이 자동차 경로는 주변 공공도로만 연결하며 나무 터널 내부로 진입하지 않음. 관방제림 또는 메타길 관람은 주차 후 도보.",
+      "request_url": "https://router.project-osrm.org/route/v1/driving/126.9854786,35.3240329;126.99192,35.3167139;127.0022261,35.3230071?overview=full&geometries=geojson&steps=false",
+      "route_file": "forest-route.json",
+      "distance_m": 2964.1,
+      "duration_s": 322.5,
+      "geometry_points": 72,
+      "road_sources": [
+        "https://www.openstreetmap.org/way/36163364",
+        "https://www.openstreetmap.org/way/1305352727",
+        "https://www.openstreetmap.org/way/1305352727"
+      ],
+      "snapped_waypoints": [
+        {
+          "hint": "PEougCcyloQ9AAAAAAAAAAAAAAAAAAAAH7q6QgAAAAAAAAAAAAAAAD0AAAAAAAAAAAAAAAAAAAA7cAAAB6WRB4EAGwIHpZEHgQAbAgAAPw4AAAAA3cg1hCgyloQEAAAAAAAAAAcAAAAAAAAAxlWwQAAAAAC-tDFBAAAAAAQAAAAAAAAABwAAAAAAAAA7cAAAB6WRB4EAGwIHpZEHgQAbAgQA3wIAAAAA",
+          "location": [
+            126.985479,
+            35.324033
+          ],
+          "name": "죽녹원로",
+          "distance": 0
+        },
+        {
+          "hint": "UW02gP_NSIQAAAAAbgAAAAAAAAAAAAAAAAAAAPDX80EAAAAAAAAAAAAAAABuAAAAAAAAAAAAAAA7cAAAML6RB-rjGgIwvpEH6uMaAgAAvwkAAAAAUG02gJqz7ocAAAAARgAAAAAAAAAbAAAAAAAAAFzsQkIAAAAAEh2ZQQAAAABGAAAAAAAAABsAAAA7cAAAML6RB-rjGgIwvpEH6uMaAgAAjxQAAAAAT202gGRS2ogAAAAAdAEAAAAAAAC7AAAAAAAAAG8qgUMAAAAAo-4BQwAAAAB0AQAAAAAAALsAAAA7cAAAML6RB-rjGgIwvpEH6uMaAgAA7w0AAAAATm02gPsS-IcAAAAAHgEAAAAAAAB_AAAAAAAAACtwRkMAAAAAlvivQgAAAAAeAQAAAAAAAH8AAAA7cAAAML6RB-rjGgIwvpEH6uMaAgAArwIAAAAA",
+          "location": [
+            126.99192,
+            35.316714
+          ],
+          "name": "담양88로 / 담양88로",
+          "distance": 0
+        },
+        {
+          "hint": "MY5FhG5GHYUAAAAArwAAAAAAAAAAAAAAAAAAAFlW80IAAAAAAAAAAAAAAACvAAAAAAAAAAAAAAA7cAAAcuaRB3_8GgJy5pEHf_waAgAAXwQAAAAAkUKvgC6ORYQTAAAAAAAAAA4AAAAAAAAAq6asQQAAAABOkHxBAAAAABMAAAAAAAAADgAAAAAAAAA7cAAAcuaRB3_8GgJy5pEHf_waAgIAHwoAAAAAK45FhC-ORYRMAAAAAAAAAAAAAAAAAAAAnSdTQgAAAAAAAAAAAAAAAEwAAAAAAAAAAAAAAAAAAAA7cAAAcuaRB3_8GgJy5pEHf_waAgAAXxUAAAAAMI5FhPkqgoQAAAAA1wAAAAAAAABFAAAAAAAAAH-bFUMAAAAANRFAQgAAAADXAAAAAAAAAEUAAAA7cAAAcuaRB3_8GgJy5pEHf_waAgAAvw8AAAAA",
+          "location": [
+            127.002226,
+            35.323007
+          ],
+          "name": "담양88로 / 담양88로",
+          "distance": 0
+        }
+      ],
+      "kakao_driving_url": "https://map.kakao.com/link/by/car/%EA%B4%80%EB%B0%A9%EC%A0%9C%EB%A6%BC%20%EB%82%A8%EC%AA%BD%20%EC%A3%BD%EB%85%B9%EC%9B%90%EB%A1%9C,35.3240329,126.9854786/%EB%8B%B4%EC%96%9188%EB%A1%9C%20%EA%B2%BD%EC%9C%A0,35.3167139,126.99192/%EB%A9%94%ED%83%80%ED%94%84%EB%A1%9C%EB%B0%A9%EC%8A%A4%C2%B7%EB%A9%94%ED%83%80%EA%B8%B8%20%EC%9D%B8%EA%B7%BC%20%EB%8B%B4%EC%96%9188%EB%A1%9C,35.3230071,127.0022261"
+    },
+    "lake": {
+      "title": "춘천 의암호 서쪽길",
+      "points": [
+        [
+          127.6741729,
+          37.8370973
+        ],
+        [
+          127.6900156,
+          37.8927957
+        ],
+        [
+          127.666728,
+          37.9691988
+        ]
+      ],
+      "labels": [
+        "의암댐 서쪽 박사로",
+        "애니메이션박물관 앞 박사로",
+        "춘천댐 인근 춘성교 서단"
+      ],
+      "ways": [
+        37405656,
+        533667620,
+        579970858
+      ],
+      "sources": [
+        "https://korean.visitkorea.or.kr/detail/ms_detail.do?cotid=ae6bfc18-f90f-46a3-bfd7-6bf0b2f5580c"
+      ],
+      "note": "호수 서쪽 도로를 잇는 샘플 경로. 공식 관광 소개의 약 12.9km는 현재 앵커 사이 거리와 다를 수 있어 OSRM 계산 거리를 사용. 자전거길·호수 보행로는 자동차 경로가 아님.",
+      "request_url": "https://router.project-osrm.org/route/v1/driving/127.6741729,37.8370973;127.6900156,37.8927957;127.666728,37.9691988?overview=full&geometries=geojson&steps=false",
+      "route_file": "lake-route.json",
+      "distance_m": 18784,
+      "duration_s": 1122.3,
+      "geometry_points": 541,
+      "road_sources": [
+        "https://www.openstreetmap.org/way/37405656",
+        "https://www.openstreetmap.org/way/533667620",
+        "https://www.openstreetmap.org/way/579970858"
+      ],
+      "snapped_waypoints": [
+        {
+          "hint": "xeE3gI6fq4kZAAAAAAAAAAAAAABOAAAA-cgYQgAAAAAAAAAAOMztQhkAAAAAAAAAAAAAAE4AAAA7cAAAPSecBylZQQI9J5wHKVlBAgAALwsAAAAA",
+          "location": [
+            127.674173,
+            37.837097
+          ],
+          "name": "박사로",
+          "distance": 0
+        },
+        {
+          "hint": "KTqghys6oIcKAAAAAAAAAAkAAABEAAAAgvxzQQAAAAC9hmJBgdHPQgoAAAAAAAAACQAAAEQAAAA7cAAAIGWcB7wyQgIgZZwHvDJCAgIA_woAAAAA",
+          "location": [
+            127.690016,
+            37.892796
+          ],
+          "name": "박사로",
+          "distance": 0
+        },
+        {
+          "hint": "UPQ2gFH0NoDNAAAAAAAAAAAAAAAAAAAA5U-5QwAAAAAAAAAAAAAAAM0AAAAAAAAAAAAAAAAAAAA7cAAAKAqcBy9dQwIoCpwHL11DAgAA_xEAAAAAUvQ2gAr8LYkAAAAABAAAAAAAAAAAAAAAAAAAAKWY9EAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAA7cAAAKAqcBy9dQwIoCpwHL11DAgAAHxIAAAAA",
+          "location": [
+            127.666728,
+            37.969199
+          ],
+          "name": "영서로",
+          "distance": 0
+        }
+      ],
+      "kakao_driving_url": "https://map.kakao.com/link/by/car/%EC%9D%98%EC%95%94%EB%8C%90%20%EC%84%9C%EC%AA%BD%20%EB%B0%95%EC%82%AC%EB%A1%9C,37.8370973,127.6741729/%EC%95%A0%EB%8B%88%EB%A9%94%EC%9D%B4%EC%85%98%EB%B0%95%EB%AC%BC%EA%B4%80%20%EC%95%9E%20%EB%B0%95%EC%82%AC%EB%A1%9C,37.8927957,127.6900156/%EC%B6%98%EC%B2%9C%EB%8C%90%20%EC%9D%B8%EA%B7%BC%20%EC%B6%98%EC%84%B1%EA%B5%90%20%EC%84%9C%EB%8B%A8,37.9691988,127.666728"
+    }
+  },
+  "verification": {
+    "method": "Official tourism sources, OpenStreetMap highway tags/geometry, OSRM driving snapshots",
+    "gps_verified": false,
+    "field_verified": false,
+    "live_traffic_verified": false,
+    "closure_verified": false,
+    "parking_entrance_verified": false,
+    "warning_ko": "공개 지도 기반 샘플 코스입니다. 현장·GPS 주행 검증을 하지 않았습니다. 도로 통제, 공사, 파도, 기상, 출입 제한 및 주차 가능 여부는 출발 전 확인하세요. 운전 중에는 조작하지 말고 현장 표지와 교통법규를 우선하세요.",
+    "warnings": [
+      "Road anchors are mapped road positions, not guaranteed safe places to stop.",
+      "Times exclude sightseeing, parking, live traffic, road closures, and weather.",
+      "Heonhwa-ro shares road space with cyclists. Do not enter the pedestrian Badabuchae-gil coastal trail by car.",
+      "Damyang Metasequoia avenue is a walking stop. The driving line follows surrounding roads.",
+      "Uiam Lake cycling and pedestrian paths are not driving roads."
+    ]
+  },
+  "road_access_tag_review": {
+    "reviewed_at_utc": "2026-11-08T01:54:34.917286+00:00",
+    "note": "Mapped tags on selected anchor ways, not a field/GPS road audit. Missing prohibitions do not guarantee present access. Full route generated using OSRM driving profile.",
+    "ways": {
+      "455119665": {
+        "highway": "tertiary",
+        "lanes": "2",
+        "oneway": "no",
+        "surface": "asphalt",
+        "bicycle": "designated",
+        "cycleway": "shared_lane",
+        "access": null,
+        "motor_vehicle": null,
+        "motorcar": null,
+        "interpretation": "Regular mapped road with cycling shared lane, not a dedicated cycleway despite bicycle-route name."
+      },
+      "183531441": {
+        "highway": "tertiary",
+        "oneway": "no"
+      },
+      "36163364": {
+        "highway": "secondary"
+      },
+      "1305352727": {
+        "highway": "residential",
+        "lanes": "4",
+        "surface": "asphalt"
+      },
+      "37405656": {
+        "highway": "secondary",
+        "lanes": "2",
+        "oneway": "no",
+        "ref": "403",
+        "surface": "asphalt"
+      },
+      "533667620": {
+        "highway": "secondary",
+        "oneway": "no",
+        "ref": "403"
+      },
+      "579970858": {
+        "highway": "primary",
+        "bridge": "yes",
+        "bridge:name": "춘성교",
+        "ref": "5;56"
+      }
+    }
+  },
+  "map_policy": {
+    "source": "https://operations.osmfoundation.org/policies/tiles/",
+    "tile_url": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+    "attribution": "© OpenStreetMap contributors",
+    "attribution_url": "https://www.openstreetmap.org/copyright",
+    "requirements": [
+      "Keep attribution visible on map.",
+      "Stable application-identifying User-Agent; no library default.",
+      "Honor server Cache-Control/Expires/ETag; seven-day TTL minimum if headers cannot be read.",
+      "Fetch only visible tiles; no prefetch/bulk downloading/offline packs.",
+      "Do not send no-cache headers by default.",
+      "Best-effort service with no SLA; production-scale use needs a suitable provider."
+    ]
+  },
+  "external_map_links": {
+    "kakao_documentation": "https://apis.map.kakao.com/web/guide/",
+    "status": "Generated according to official URL documentation; destination-app route choices may differ from OSM snapshot. No user device location included.",
+    "waypoints": "Kakao supports up to five intermediate waypoints except for transit. car is the documented driving mode."
+  },
+  "photo_credits": {
+    "coast": {
+      "asset": "coast.jpg",
+      "title": "Jeongdongjin Beach",
+      "author": "Loewelad",
+      "license": "CC BY-SA 3.0",
+      "license_url": "https://creativecommons.org/licenses/by-sa/3.0/",
+      "source_url": "https://commons.wikimedia.org/wiki/File:Jeongdongjin_Beach.jpg",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/e/e6/Jeongdongjin_Beach.jpg",
+      "depicts": "Jeongdongjin beach near north end of sample course, not the entire Heonhwa-ro road."
+    },
+    "forest": {
+      "asset": "forest.jpg",
+      "title": "Metasequoia glyptostroboides Avenue",
+      "author": "dalgial",
+      "license": "CC BY-SA 3.0",
+      "license_url": "https://creativecommons.org/licenses/by-sa/3.0/",
+      "source_url": "https://commons.wikimedia.org/wiki/File:Metasequoia_glyptostroboides_Avenue.JPG",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/1/10/Metasequoia_glyptostroboides_Avenue.JPG",
+      "depicts": "Damyang Metasequoia walking avenue, a stop near the driving route. This pictured avenue is not the driving line."
+    },
+    "lake": {
+      "asset": "lake.jpg",
+      "title": "20231226 공지천유원지에서 바라본 의암호",
+      "author": "YellowTurtle9",
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "source_url": "https://commons.wikimedia.org/wiki/File:20231226_공지천유원지에서_바라본_의암호.jpg",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/2/26/20231226_%EA%B3%B5%EC%A7%80%EC%B2%9C%EC%9C%A0%EC%9B%90%EC%A7%80%EC%97%90%EC%84%9C_%EB%B0%94%EB%9D%BC%EB%B3%B8_%EC%9D%98%EC%95%94%ED%98%B8.jpg",
+      "depicts": "Uiam Lake viewed from Gongjicheon/Uiam Park on east shore, not the exact west-shore driving position."
+    }
+  },
+  "photo_reuse_notes": "Credit title, author, source and license. Mark display cropping/resizing. CC BY-SA images and adapted versions remain under applicable share-alike license. This does not make the whole app CC BY-SA. Photos are historical real images, not live road conditions."
+}

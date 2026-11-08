@@ -10,11 +10,12 @@ data class Stop(val name: String, val point: Point)
 data class Route(val id: String, val title: String, val subtitle: String, val minutes: Int, val stops: List<Stop>)
 object Catalog {
  val routes = listOf(
-  Route("coast", "푸른 해안의 여백", "가상 해안 · 바다와 작은 쉼터", 48, listOf(Stop("해안 입구", Point(35.0,129.0)), Stop("파도 쉼터", Point(35.01,129.01)), Stop("노을 전망대", Point(35.02,129.02)))),
-  Route("forest", "숲을 천천히 읽는 길", "가상 숲길 · 초록과 느린 오후", 35, listOf(Stop("숲길 입구", Point(36.0,128.0)), Stop("초록 카페", Point(36.01,128.01)), Stop("나무 전망대", Point(36.02,128.02)))),
-  Route("lake", "호수를 따라, 한 바퀴", "가상 호수 · 잔잔한 주말", 62, listOf(Stop("호수 입구", Point(37.0,127.0)), Stop("물빛 쉼터", Point(37.01,127.01)), Stop("호수 전망대", Point(37.02,127.02))))
+  Route("coast", "강릉 헌화로", "강릉 · 금진항에서 정동진까지", 10, listOf(Stop("금진항 앞 헌화로", Point(37.652838,129.0516881)), Stop("심곡항 앞 헌화로", Point(37.6642503,129.0546272)), Stop("정동진 해변 인근", Point(37.6906013,129.0315582)))),
+  Route("forest", "담양 메타길 나들이", "담양 · 주변 도로 주행, 나무길은 도보", 5, listOf(Stop("관방제림 남쪽 도로", Point(35.3240329,126.9854786)), Stop("담양88로", Point(35.3167139,126.99192)), Stop("메타길 인근 도로", Point(35.3230071,127.0022261)))),
+  Route("lake", "춘천 의암호 서쪽길", "춘천 · 의암댐에서 춘천댐 방향으로", 19, listOf(Stop("의암댐 서쪽 박사로", Point(37.8370973,127.6741729)), Stop("애니메이션박물관 앞", Point(37.8927957,127.6900156)), Stop("춘천댐 인근 춘성교", Point(37.9691988,127.666728))))
  )
 }
+
 data class Evidence(val point: Point, val accuracyM: Double, val timeMs: Long, val simulated: Boolean)
 data class Trip(val id: String, val routeId: String, val startedMs: Long, val nextStop: Int = 0, val lastEvidenceMs: Long = 0, val mode: Mode = Mode.SIMULATOR)
 data class Award(val tripId: String, val routeId: String, val simulated: Boolean, val timeMs: Long)

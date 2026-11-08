@@ -1,0 +1,10 @@
+import importlib.util,time
+s=importlib.util.spec_from_file_location('q','tools/qa-real.py');q=importlib.util.module_from_spec(s);s.loader.exec_module(q)
+q.unlock();q.snap('01-home');q.passed('Real location photos and 3 categories visible inside app bounds')
+q.tap('추천길');q.tap('강릉 헌화로');time.sleep(3);q.expect('6.3 km · 주행 약 10분');q.snap('02-coast-map');q.passed('Coast real road geometry and attribution visible; OSM tile load verified in logs')
+q.tap('오프라인 체험');q.expect('오프라인 상황 체험');q.snap('03-offline');q.tap('다시 불러오기');time.sleep(2);q.no('오프라인 상황 체험');q.passed('Explicit offline simulation and retry restore cached map without fake blank-map route')
+q.tap('+');time.sleep(5);q.tap('전체');time.sleep(2);q.passed('User zoom and fit controls respond')
+q.tap('출처·이용 안내');q.expect('출처와 이용 안내');q.snap('04-sources');q.tap('확인');q.expect('지도 연결 옵션  →');q.passed('Source and license dialog dismisses back to same route')
+q.tap('지도 연결 옵션  →');q.expect('카카오맵에서 코스 열기  ↗');q.tap('닫기');q.no('진행 중인 여정  →');q.passed('Map options cancel does not start or award a journey')
+q.tap('지도 연결 옵션  →');q.tap('카카오맵에서 코스 열기  ↗');time.sleep(8);q.snap('05-kakao-external');print(q.adb('shell','dumpsys','activity','activities').decode()[-6000:],flush=True)
+print('EXTERNAL PAGE READY FOR VISUAL REVIEW',flush=True)

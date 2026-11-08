@@ -118,7 +118,7 @@ class MainActivity : ComponentActivity() {
                                 onTrip = { page = "trip" }, onAtlas = { page = "atlas" })
                             "curation" -> CurationPage(curation, filters, engine.snapshot.awards, ::open, { page = "discover" })
                             "records" -> RecordsPage(engine.snapshot, ::open)
-                            "detail" -> DetailPage(selected, engine.snapshot.trip != null, heroHeight,
+                            "detail" -> RealDetailPage(selected, engine.snapshot.trip != null,
                                 onBack = { page = detailReturn }, onStart = { navDialog = true }, onTrip = { page = "trip" })
                             "trip" -> TripPage(engine.snapshot.trip, engine.location, heroHeight,
                                 onDiscover = { page = "discover" }, onEvidence = { act {
@@ -142,8 +142,8 @@ class MainActivity : ComponentActivity() {
                         }
                         Spacer(Modifier.height(26.dp))
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("가상 코스 · GPS/차량/내비 미연동 · 운전 중 조작 금지", color = Muted, fontSize = 13.sp)
-                            Text("DRIVE ATLAS / DEMO 03", color = Muted, fontFamily = Mono, fontSize = 12.sp)
+                            Text("실제 장소·지도 · 방문/주행은 모의 체험 · 운전 중 조작 금지", color = Muted, fontSize = 13.sp)
+                            Text("DRIVE ATLAS / REAL ROADS 04", color = Muted, fontFamily = Mono, fontSize = 12.sp)
                         }
                         Spacer(Modifier.height(if (message.isNotBlank()) 72.dp else 8.dp))
                     }
@@ -163,8 +163,8 @@ class MainActivity : ComponentActivity() {
             debug = false
             message = ""
         }
-        if (engine.canEdit && navDialog) DemoNavigationDialog(selected, onDismiss = { navDialog = false }, onStart = {
-            act { if (engine.start(selected.id, System.currentTimeMillis())) { navDialog = false; page = "trip"; message = "내비 연결 성공을 체험했어요. 실제 내비는 실행하지 않았습니다." } }
+        if (engine.canEdit && navDialog) RealNavigationDialog(selected, onDismiss = { navDialog = false }, onStart = {
+            act { if (engine.start(selected.id, System.currentTimeMillis())) { navDialog = false; page = "trip"; message = "모의 여정을 시작했어요. 실제 내비 안내나 방문 인증은 아닙니다." } }
         })
         if (engine.canEdit && archiveDialog) ArchiveDialog(onDismiss = { archiveDialog = false }) { status ->
             act { if (engine.archive(status, System.currentTimeMillis())) { archiveDialog = false; page = "records"; message = "여행 기록만 남겼어요. 완주 우표는 발급하지 않았습니다." } }
@@ -414,7 +414,7 @@ class MainActivity : ComponentActivity() {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(25.dp)) {
         Column(Modifier.weight(.56f)) {
             Box(Modifier.fillMaxWidth().height(heroHeight + 80.dp).clip(Corner)) {
-                PixelRouteMap(Catalog.routes.indexOf(route), Modifier.fillMaxSize(), progress = trip.nextStop)
+                RealRoadMap(route, Modifier.fillMaxSize())
                 Tag("${trip.nextStop} / 3  SCENES", White, Ink, Modifier.padding(20.dp))
             }
             Spacer(Modifier.height(20.dp))

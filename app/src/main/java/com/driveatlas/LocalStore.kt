@@ -5,7 +5,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 class LocalStore(context: Context) : AtlasStore {
- private val prefs = context.getSharedPreferences("atlas_demo_v3", Context.MODE_PRIVATE)
+ private val prefs = context.getSharedPreferences("atlas_real_v4", Context.MODE_PRIVATE)
  override fun load(): Snapshot = try {
   val raw = prefs.getString("snapshot", null)
   if (raw == null) Snapshot() else {

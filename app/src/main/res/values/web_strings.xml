@@ -1,0 +1,9 @@
+<resources>
+ <string name="web_title">외부 웹 지도·출처 보기 · PLEOS 차량 내비 미연동</string>
+ <string name="web_pending">%1$s · 위치 권한은 제공하지 않습니다</string>
+ <string name="web_return">← DRIVE ATLAS로 돌아가기</string>
+ <string name="web_reload">다시 불러오기</string>
+ <string name="web_blocked">앱 설치 링크는 열지 않습니다. 지도 페이지의 ‘설치없이 지도보기’를 선택하세요.</string>
+ <string name="web_loaded">%1$s · 외부 서비스 화면 · 실제 주행 시작 아님</string>
+ <string name="web_error">웹 지도를 불러오지 못했어요. 인터넷 연결 또는 외부 서비스 지원을 확인해 주세요.</string>
+</resources>
