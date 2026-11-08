@@ -1,7 +1,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
  <uses-permission android:name="android.permission.INTERNET"/>
- <queries><intent><action android:name="android.intent.action.VIEW"/><data android:scheme="https"/></intent></queries>
- <application android:icon="@mipmap/ic_atlas" android:roundIcon="@mipmap/ic_atlas" android:label="DRIVE ATLAS Roads" android:theme="@android:style/Theme.Material.NoActionBar" android:allowBackup="false" android:supportsRtl="true">
+ <uses-permission android:name="android.car.permission.CAR_POWERTRAIN"/>
+ <uses-permission android:name="pleos.car.permission.NAVI_ROUTE"/>
+ <uses-permission android:name="pleos.car.permission.NAVI_ROUTE_SEARCH"/>
+ <uses-permission android:name="pleos.car.permission.NAVI_CUSTOM_MAP"/>
+ <uses-permission android:name="pleos.car.permission.FUSED_LOCATION"/>
+ <queries><package android:name="ai.pleos.playground.service.location.fused"/><intent><action android:name="android.intent.action.VIEW"/><data android:scheme="https"/></intent></queries>
+ <application android:icon="@mipmap/ic_atlas" android:roundIcon="@mipmap/ic_atlas" android:label="DRIVE ATLAS Connected" android:theme="@android:style/Theme.Material.NoActionBar" android:allowBackup="false" android:supportsRtl="true">
+  <uses-library android:name="android.car" android:required="false"/>
   <activity android:name=".PublicWebActivity" android:exported="false"/>
   <activity android:name=".MainActivity" android:exported="true">
    <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>

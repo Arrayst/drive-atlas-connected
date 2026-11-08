@@ -6,13 +6,16 @@ plugins {
 android {
  namespace = "com.driveatlas"
  compileSdk = 35
- defaultConfig { applicationId = "com.driveatlas.real"; minSdk = 28; targetSdk = 35; versionCode = 4; versionName = "0.4.0-real-roads" }
- buildTypes { debug { applicationIdSuffix = ".simulator"; buildConfigField("boolean", "SIMULATOR", "true") }; release { buildConfigField("boolean", "SIMULATOR", "false") } }
+ useLibrary("android.car")
+ defaultConfig { applicationId = "com.driveatlas.connected"; minSdk = 28; targetSdk = 35; versionCode = 5; versionName = "0.5.0-connected" }
+ buildTypes { debug { applicationIdSuffix = ".emulator"; buildConfigField("boolean", "SIMULATOR", "true") }; release { buildConfigField("boolean", "SIMULATOR", "false") } }
  compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
  kotlinOptions { jvmTarget = "17" }
  buildFeatures { compose = true; buildConfig = true }
 }
 dependencies {
+ implementation("ai.pleos.playground:NaviHelper:3.0.5")
+ implementation("ai.pleos.playground:FusedLocation:1.1.3")
  implementation(libs.androidx.core.ktx)
  implementation(libs.androidx.lifecycle.runtime.ktx)
  implementation(libs.androidx.lifecycle.runtime.compose)

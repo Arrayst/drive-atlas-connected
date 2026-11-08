@@ -49,13 +49,17 @@ internal fun directionsUrl(route:Route):String = "https://map.kakao.com/link/by/
 internal fun regionFor(route:Route)=when(route.id){"coast"->"강릉";"forest"->"담양";else->"춘천"}
 @Composable internal fun RoadStats(route:Route){val c=LocalContext.current;val r=remember(route.id){readRoad(c,route.id)};Text(String.format(Locale.KOREA,"%.1f km · 주행 약 %.0f분",r.meters/1000,r.seconds/60),fontSize=22.sp,fontWeight=FontWeight.Bold,color=Ink);Text("OSRM 추정 · 정차·교통상황 제외",fontSize=13.sp,color=Muted)}
 @Composable internal fun PhotoAttribution(route:Route){val c=LocalContext.current;val p=photoCredit(route);Text(p.caption,fontSize=13.sp,color=Muted);TextButton(onClick={openWeb(c,p.source)},contentPadding=PaddingValues(0.dp)){Text("사진: ${p.author} · ${p.license} ↗",fontSize=12.sp)}}
-@Composable internal fun RealNavigationDialog(route:Route,onDismiss:()->Unit,onStart:()->Unit){
+@Composable internal fun RealNavigationDialog(route:Route,nativeStatus:String,onNativeSearch:()->Unit,onNativeRoute:()->Unit,onNativeOpen:()->Unit,onDismiss:()->Unit,onStart:()->Unit){
  val context=LocalContext.current
  Dialog(onDismissRequest=onDismiss,properties=DialogProperties(usePlatformDefaultWidth=false)){
-  Surface(Modifier.widthIn(max=850.dp).padding(24.dp),color=Paper,shape=Corner){Column(Modifier.padding(32.dp)){
+  Surface(Modifier.widthIn(max=850.dp).padding(24.dp),color=Paper,shape=Corner){Column(Modifier.verticalScroll(rememberScrollState()).padding(32.dp)){
    Eyebrow("MAP CONNECTION");Text("길을 확인하고, 안전하게 출발해요",fontSize=29.sp,fontWeight=FontWeight.Bold,color=Ink,modifier=Modifier.padding(vertical=16.dp))
    Text(route.title,fontSize=22.sp,color=Muted);Spacer(Modifier.height(20.dp))
-   NoteBlock("지도는 연결, 차량 내비는 아직 미연동","카카오맵에는 공개 코스의 출발·경유·도착 좌표를 전달합니다. 현재 위치는 요청하지 않아요. PLEOS 내비 경유지 전달·턴바이턴 안내는 SDK 권한과 실제 응답 검증이 남아 있습니다.")
+   NoteBlock("PLEOS 기본 내비",nativeStatus)
+   Spacer(Modifier.height(12.dp));PrimaryButton("기본 내비에서 도착지 검색",onNativeSearch,Modifier.fillMaxWidth())
+   Spacer(Modifier.height(12.dp));SecondaryButton("공개 좌표 코스 전달 · 실험",onNativeRoute,Modifier.fillMaxWidth())
+   Text("코스 시작점과 경유지, 도착점을 기본 내비에 보냅니다. POI ID 없는 좌표 요청은 서비스가 거절할 수 있으며 완료 콜백과 좌표 대조 전에는 성공으로 처리하지 않습니다. 기존 내비 경로가 변경될 수 있어요.",fontSize=14.sp,color=Muted,modifier=Modifier.padding(vertical=10.dp))
+   SecondaryButton("기본 내비 화면 보기",onNativeOpen,Modifier.fillMaxWidth())
    Spacer(Modifier.height(22.dp));PrimaryButton("카카오맵에서 코스 열기  ↗",{openWeb(context,directionsUrl(route))},Modifier.fillMaxWidth())
    Text("앱 안 웹 보기에서는 ‘설치없이 지도보기’를 선택하세요. 외부 지도에서 재탐색하므로 화면의 코스와 달라질 수 있습니다. 차량 내비나 우표 여정은 시작하지 않습니다.",fontSize=14.sp,color=Muted,modifier=Modifier.padding(top=10.dp,bottom=20.dp))
    SecondaryButton("OSM에서 도착지 보기  ↗",{openWeb(context,destinationUrl(route))},Modifier.fillMaxWidth())
@@ -94,7 +98,7 @@ internal fun regionFor(route:Route)=when(route.id){"coast"->"강릉";"forest"->"
    route.stops.forEachIndexed{i,s->StopRow(i,s.name,false,false,if(route.id=="forest"&&i==2)"인근 도로 지점 · 나무길은 주차 후 산책" else "도로 기준점 · 주차장/정차 지점 보장 아님",i==2)}
    Spacer(Modifier.height(18.dp));PrimaryButton("지도 연결 옵션  →",onStart,Modifier.fillMaxWidth())
    if(hasTrip){Spacer(Modifier.height(10.dp));SecondaryButton("진행 중인 체험 보기",onTrip,Modifier.fillMaxWidth())}
-   Text("GPS·차량 상태·실제 방문 인증은 미연동",fontSize=13.sp,color=Muted,modifier=Modifier.padding(top=14.dp))
+   Text("차량 P·UX 연동 / GPS는 별도 승인 / 실제 방문 인증 미구현",fontSize=13.sp,color=Muted,modifier=Modifier.padding(top=14.dp))
   }
  }
  if(sources)SourcesDialog(route){sources=false}

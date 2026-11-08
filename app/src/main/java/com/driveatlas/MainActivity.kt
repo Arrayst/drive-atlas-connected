@@ -6,6 +6,7 @@ import android.graphics.Canvas as AndroidCanvas
 import android.graphics.Paint
 import android.graphics.Typeface
 import android.os.Bundle
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -61,10 +62,20 @@ internal val Corner = RoundedCornerShape(12.dp)
 class MainActivity : ComponentActivity() {
     private lateinit var engine: AtlasEngine
     private var revision by mutableIntStateOf(0)
+    private lateinit var connections: PleosConnections
+    private var connectionState by mutableStateOf(ConnectionState())
+    private val permissionRequest = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) connections.connectLocationIfGranted() else connections.retry()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         engine = AtlasEngine(LocalStore(this), if (BuildConfig.SIMULATOR) Mode.SIMULATOR else Mode.VEHICLE)
+        connections = PleosConnections(this) { state ->
+            connectionState = state
+            engine.setSafety(state.safety)
+            revision++
+        }
         setContent {
             MaterialTheme(colorScheme = lightColorScheme(primary = Ink, onPrimary = White,
                 secondary = Coral, background = Paper, surface = White, onSurface = Ink,
@@ -72,7 +83,18 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        connections.start()
+    }
+
+    override fun onDestroy() {
+        connections.destroy()
+        super.onDestroy()
+    }
+
     override fun onStop() {
+        connections.stop()
         super.onStop()
         engine.setSafety(Safety.UNKNOWN)
         engine.setLocation(LocationStatus.LOST)
@@ -143,7 +165,7 @@ class MainActivity : ComponentActivity() {
                         Spacer(Modifier.height(26.dp))
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text("실제 장소·지도 · 방문/주행은 모의 체험 · 운전 중 조작 금지", color = Muted, fontSize = 13.sp)
-                            Text("DRIVE ATLAS / REAL ROADS 04", color = Muted, fontFamily = Mono, fontSize = 12.sp)
+                            Text("DRIVE ATLAS / CONNECTED 05", color = Muted, fontFamily = Mono, fontSize = 12.sp)
                         }
                         Spacer(Modifier.height(if (message.isNotBlank()) 72.dp else 8.dp))
                     }
@@ -158,13 +180,13 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-        if (debug && BuildConfig.SIMULATOR) DebugDialog(engine.safety, engine.location, onDismiss = { debug = false }) { safety, location ->
-            act { safety?.let(engine::setSafety); location?.let(engine::setLocation) }
-            debug = false
-            message = ""
-        }
-        if (engine.canEdit && navDialog) RealNavigationDialog(selected, onDismiss = { navDialog = false }, onStart = {
-            act { if (engine.start(selected.id, System.currentTimeMillis())) { navDialog = false; page = "trip"; message = "모의 여정을 시작했어요. 실제 내비 안내나 방문 인증은 아닙니다." } }
+        if (debug) ConnectionsDialog(connectionState, onDismiss = { debug = false }, onRetry = { connections.retry() }, onLocationPermission = {
+            if (engine.canEdit) permissionRequest.launch(PleosConnections.LOCATION_PERMISSION)
+        })
+        if (engine.canEdit && navDialog) RealNavigationDialog(selected, connectionState.navigation,
+            onNativeSearch = { connections.openNativeSearch(selected) }, onNativeRoute = { connections.requestNativeRoute(selected) },
+            onNativeOpen = { connections.showNative() }, onDismiss = { navDialog = false }, onStart = {
+            act { engine.setLocation(LocationStatus.AVAILABLE); if (engine.start(selected.id, System.currentTimeMillis())) { navDialog = false; page = "trip"; message = "모의 여정을 시작했어요. 실제 내비 안내나 방문 인증은 아닙니다." } }
         })
         if (engine.canEdit && archiveDialog) ArchiveDialog(onDismiss = { archiveDialog = false }) { status ->
             act { if (engine.archive(status, System.currentTimeMillis())) { archiveDialog = false; page = "records"; message = "여행 기록만 남겼어요. 완주 우표는 발급하지 않았습니다." } }
@@ -251,11 +273,11 @@ class MainActivity : ComponentActivity() {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(7.dp).background(if (unlocked) Amber else Color(0xFF9BAD9A)))
             Spacer(Modifier.width(8.dp))
-            Text(if (unlocked) "가상 주차 상태" else "안전 확인 대기", color = White, fontSize = 13.sp)
+            Text(if (unlocked) "P · UX 제한 해제 확인" else "차량 상태 확인/제한", color = White, fontSize = 13.sp)
         }
-        Text(if (BuildConfig.SIMULATOR) "SIMULATOR DEMO" else "VEHICLE UNVERIFIED", color = Color(0xFF91A58F), fontFamily = Mono, fontSize = 10.sp, modifier = Modifier.padding(top = 9.dp))
-        if (BuildConfig.SIMULATOR) TextButton(onClick = onDebug, contentPadding = PaddingValues(0.dp), modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
-            Text("시뮬레이터 제어  +", color = Color(0xFFC9D5C3), fontSize = 12.sp)
+        Text(if (BuildConfig.SIMULATOR) "PLEOS EMULATOR / LIVE" else "PLEOS CONNECTION", color = Color(0xFF91A58F), fontFamily = Mono, fontSize = 10.sp, modifier = Modifier.padding(top = 9.dp))
+        TextButton(onClick = onDebug, contentPadding = PaddingValues(0.dp), modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
+            Text("연결 상태 보기  +", color = Color(0xFFC9D5C3), fontSize = 12.sp)
         }
     }
 }
@@ -516,7 +538,7 @@ class MainActivity : ComponentActivity() {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(42.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Eyebrow("SAFETY FIRST / DRIVE ATLAS")
-            Tag(if (safety == Safety.MOVING) "주행 상태" else "차량 상태 미확인", Sage, Ink)
+            Tag(if (safety == Safety.MOVING) "차량 조작 제한" else "차량 상태 미확인", Sage, Ink)
         }
         Spacer(Modifier.height(44.dp))
         Surface(color = White, shape = Corner, border = BorderStroke(1.dp, Line)) {
@@ -528,8 +550,8 @@ class MainActivity : ComponentActivity() {
                 }
                 Column(Modifier.weight(.50f).padding(36.dp), verticalArrangement = Arrangement.Center) {
                     PixelIcon("lock", Coral, Modifier.size(44.dp))
-                    Text("잠시,\n운전에 집중해요.", fontSize = 39.sp, lineHeight = 52.sp, color = Ink, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 24.dp))
-                    Text("안전한 주차가 확인되면\n다시 여행 도감을 펼칠 수 있어요.", fontSize = 20.sp, color = Muted, lineHeight = 32.sp, modifier = Modifier.padding(top = 22.dp))
+                    Text(if (safety == Safety.UNKNOWN) "차량 연결을\n확인하고 있어요." else "주차 확인 후\n펼쳐 주세요.", fontSize = 39.sp, lineHeight = 52.sp, color = Ink, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 24.dp))
+                    Text(if (safety == Safety.UNKNOWN) "아직 주행 중이라는 뜻은 아니에요.\n기어와 차량 제한 상태를 확인합니다." else "P 기어와 차량 UX 제한 해제가\n함께 확인되면 자동으로 열립니다.", fontSize = 20.sp, color = Muted, lineHeight = 32.sp, modifier = Modifier.padding(top = 22.dp))
                     Tag("탐색 · 여정 조작 · 카드 생성 잠금", Sage, Ink, Modifier.padding(top = 26.dp))
                 }
             }
@@ -550,8 +572,7 @@ class MainActivity : ComponentActivity() {
             Spacer(Modifier.height(25.dp))
         }
         NoteBlock("멈춰 있다고 주차 상태는 아니에요", "신호 대기나 속도 0만으로 잠금을 해제하지 않습니다. 차량 상태가 확인되지 않을 때도 안전을 위해 잠금을 유지합니다.")
-        Text(if (BuildConfig.SIMULATOR) "SIMULATOR DEMO · 실제 차량 신호는 연결되지 않았습니다. 개발용 가상 상태는 왼쪽 아래에서 제어합니다."
-            else "VEHICLE UNVERIFIED · 실차 어댑터가 연결되지 않아 주차 상태를 확인할 수 없습니다.", color = Muted, fontSize = 14.sp, lineHeight = 22.sp, modifier = Modifier.padding(top = 25.dp))
+        Text("PLEOS 연결 상태는 왼쪽 아래에서 확인하세요. 화면으로 돌아오면 기어와 UX 제한을 다시 읽습니다. 에뮬레이터 신호는 실제 주행 증거가 아닙니다.", color = Muted, fontSize = 14.sp, lineHeight = 22.sp, modifier = Modifier.padding(top = 25.dp))
     }
 }
 
