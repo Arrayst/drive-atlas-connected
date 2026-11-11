@@ -4,6 +4,14 @@ import android.content.Context
 import android.graphics.BitmapFactory
 import android.net.http.HttpResponseCache
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -35,7 +43,7 @@ internal fun worldPoint(p:Point,z:Int):Pair<Double,Double>{val n=256.0*(1 shl z)
 internal data class MapViewport(val zoom:Int,val left:Double,val top:Double,val width:Int,val height:Int)
 internal fun fittedViewport(points:List<Point>,width:Int,height:Int,extraZoom:Int=0):MapViewport {
  var zoom=8
- for(z in 8..16){val ps=points.map{worldPoint(it,z)};if(ps.maxOf{it.first}-ps.minOf{it.first}<width-150&&ps.maxOf{it.second}-ps.minOf{it.second}<height-130)zoom=z else break}
+ for(z in 8..16){val ps=points.map{worldPoint(it,z)};if(ps.maxOf{it.first}-ps.minOf{it.first}<width-minOf(150.0,width*.2)&&ps.maxOf{it.second}-ps.minOf{it.second}<height-minOf(130.0,height*.25))zoom=z else break}
  zoom=(zoom+extraZoom).coerceIn(8,16);val ps=points.map{worldPoint(it,zoom)}
  return MapViewport(zoom,(ps.minOf{it.first}+ps.maxOf{it.first})/2-width/2,(ps.minOf{it.second}+ps.maxOf{it.second})/2-height/2,width,height)
 }
@@ -57,26 +65,56 @@ private suspend fun loadVisibleTiles(context:Context,v:MapViewport):List<MapTile
 @Composable internal fun RealRoadMap(route:Route,modifier:Modifier=Modifier) {
  val context=LocalContext.current
  val road=remember(route.id){readRoad(context,route.id)}
+ val selectedRestIds=remember(route.id){FamilyStore(context).loadFamily().plans[route.id]?.effectiveRestFacilityIds.orEmpty().toSet()}
+ val places=remember(route.id,selectedRestIds){mapPlaces(route,selectedRestIds)}
+ var filter by remember(route.id){mutableStateOf<MapPlaceKind?>(null)}
+ var selected by remember(route.id){mutableStateOf<MapPlace?>(null)}
+ var listOpen by remember(route.id){mutableStateOf(false)}
+ val shown=visibleMapPlaces(places,filter)
  var zoom by remember(route.id){mutableIntStateOf(0)}
  var failedMode by remember(route.id){mutableStateOf(false)}
  var refresh by remember(route.id){mutableIntStateOf(0)}
  BoxWithConstraints(modifier.clipToBounds().background(Sage)){
   val density=androidx.compose.ui.platform.LocalDensity.current
   val w=with(density){maxWidth.roundToPx()};val h=with(density){maxHeight.roundToPx()}
-  val v=remember(route.id,w,h,zoom){fittedViewport(road.points,w,h,zoom)}
+  val insetTop=with(density){112.dp.roundToPx()};val insetBottom=with(density){106.dp.roundToPx()}
+  val v=remember(route.id,w,h,zoom){
+   val fit=fittedViewport(road.points+places.map{it.point},w,(h-insetTop-insetBottom).coerceAtLeast(90),zoom)
+   fit.copy(top=fit.top-insetTop,height=h)
+  }
   var tiles by remember(route.id,v,failedMode,refresh){mutableStateOf<List<MapTile>?>(null)}
   LaunchedEffect(route.id,v,failedMode,refresh){tiles=if(failedMode) emptyList() else loadVisibleTiles(context,v)}
+  val pinSize=64.dp
+  val half=with(density){pinSize.toPx()/2}
+  val anchors=shown.map { val xy=worldPoint(it.point,v.zoom);MapPinPosition((xy.first-v.left).toFloat(),(xy.second-v.top).toFloat()) }
+  val pinPositions=separateMapPins(anchors,half+8,insetTop+half,(w-half-92).coerceAtLeast(half+8),(h-insetBottom-half).coerceAtLeast(insetTop+half),half*2+8)
   Canvas(Modifier.fillMaxSize()){
    tiles.orEmpty().forEach{t->t.image?.let{drawImage(it,Offset((t.x*256-v.left).toFloat(),(t.y*256-v.top).toFloat()))}}
    if(tiles.orEmpty().any{it.image!=null}){
     val path=Path();road.points.forEachIndexed{i,p->val xy=worldPoint(p,v.zoom);val x=(xy.first-v.left).toFloat();val y=(xy.second-v.top).toFloat();if(i==0)path.moveTo(x,y)else path.lineTo(x,y)}
     drawPath(path,Color.White,style=Stroke(width=11f,cap=StrokeCap.Round,join=StrokeJoin.Round));drawPath(path,Coral,style=Stroke(width=6f,cap=StrokeCap.Round,join=StrokeJoin.Round))
-    route.stops.forEachIndexed{i,p->val xy=worldPoint(p.point,v.zoom);val c=Offset((xy.first-v.left).toFloat(),(xy.second-v.top).toFloat());drawCircle(Color.White,19f,c);drawCircle(Ink,15f,c)
-     drawIntoCanvas{canvas->val paint=android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply{color=android.graphics.Color.WHITE;textSize=19f;textAlign=android.graphics.Paint.Align.CENTER;isFakeBoldText=true};canvas.nativeCanvas.drawText("${i+1}",c.x,c.y+7,paint)}
+    anchors.forEachIndexed { i,a -> val pin=pinPositions[i];drawLine(Color.White,Offset(a.x,a.y),Offset(pin.x,pin.y),6f);drawLine(Ink,Offset(a.x,a.y),Offset(pin.x,pin.y),2f);drawCircle(Ink,4f,Offset(a.x,a.y)) }
+
+
+   }
+  }
+  if(tiles.orEmpty().any{it.image!=null}) shown.forEachIndexed { index,place ->
+   val px=pinPositions[index].x;val py=pinPositions[index].y
+   if(px in half..(w-half)&&py in half..(h-half)) {
+    Button(onClick={selected=place},modifier=Modifier.offset{IntOffset((px-half).roundToInt(),(py-half).roundToInt())}.size(pinSize)
+     .semantics { contentDescription=place.name+if(place.selectedRest)" · 가족 계획에 선택됨" else " · 장소 정보" },
+     shape=CircleShape,contentPadding=PaddingValues(0.dp),
+     colors=ButtonDefaults.buttonColors(containerColor=when {MapPlaceKind.PHOTO in place.kinds->Color(0xFF6A42C2);MapPlaceKind.REST in place.kinds->Color(0xFF176B52);else->Ink}),
+     border=androidx.compose.foundation.BorderStroke(if(place.selectedRest)4.dp else 2.dp,Color.White)) {
+      Text(if(MapPlaceKind.PHOTO in place.kinds)"사진" else place.badge,fontSize=24.sp,fontWeight=FontWeight.Bold)
     }
    }
   }
-  Surface(Modifier.align(Alignment.TopStart).padding(12.dp),color=White.copy(alpha=.96f),shape=Corner){Column(Modifier.padding(12.dp)){Text("실제 지도 · 도로 경로",fontSize=16.sp,color=Ink);Text("OSRM 스냅샷 · 실시간 안내 아님",fontSize=12.sp,color=Muted)}}
+  Surface(Modifier.align(Alignment.TopStart).padding(12.dp).padding(end=90.dp),color=White.copy(alpha=.97f),shape=Corner){Column(Modifier.padding(horizontal=12.dp,vertical=8.dp)){
+   Text("코스와 쉬어 갈 곳",fontSize=17.sp,color=Ink,fontWeight=FontWeight.Bold)
+   Text("파란 선: 코스 · 핀 연결점: 대표 위치",fontSize=12.sp,color=Muted)
+   TextButton(onClick={listOpen=true},contentPadding=PaddingValues(0.dp),modifier=Modifier.heightIn(min=48.dp)){Text("${filter?.label?:"전체"} ${shown.size}곳 · 목록",fontSize=15.sp)}
+  }}
   Column(Modifier.align(Alignment.TopEnd).padding(12.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){
    FilledTonalButton(onClick={zoom=(zoom+1).coerceAtMost(2)},enabled=zoom<2,contentPadding=PaddingValues(0.dp),modifier=Modifier.size(76.dp)){Text("+",fontSize=27.sp)}
    FilledTonalButton(onClick={zoom=(zoom-1).coerceAtLeast(-2)},enabled=zoom> -2,contentPadding=PaddingValues(0.dp),modifier=Modifier.size(76.dp)){Text("−",fontSize=27.sp)}
@@ -85,9 +123,50 @@ private suspend fun loadVisibleTiles(context:Context,v:MapViewport):List<MapTile
   if(tiles==null)Surface(Modifier.align(Alignment.Center),color=White,shape=Corner){Text("실제 지도를 불러오는 중…",Modifier.padding(20.dp),color=Ink)}
   else if(tiles.orEmpty().none{it.image!=null})Surface(Modifier.align(Alignment.Center).padding(70.dp),color=White,shape=Corner){Column(Modifier.padding(24.dp)){Text(if(failedMode)"오프라인 상황 체험" else "지도를 불러오지 못했어요",fontSize=20.sp,color=Ink);Text("인터넷 연결이 필요해요. 경로를 빈 지도 위에 그리지 않습니다.",fontSize=15.sp,color=Muted);TextButton(onClick={failedMode=false;refresh++}){Text("다시 불러오기")}}}
   else if(tiles.orEmpty().any{it.image==null})Surface(Modifier.align(Alignment.Center),color=White){Text("일부 지도 영역을 불러오지 못했어요",Modifier.padding(12.dp),color=Ink)}
-  Row(Modifier.align(Alignment.BottomStart).fillMaxWidth().background(White.copy(alpha=.96f)),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween){
-   if(BuildConfig.SIMULATOR)TextButton(onClick={failedMode=!failedMode}){Text(if(failedMode)"온라인으로" else "오프라인 체험",fontSize=12.sp)}
-   TextButton(onClick={openWeb(context,"https://www.openstreetmap.org/copyright")}){Text("© OpenStreetMap contributors",fontSize=13.sp,color=Ink)}
+  Column(Modifier.align(Alignment.BottomStart).fillMaxWidth().background(White.copy(alpha=.97f))){
+   Row(Modifier.fillMaxWidth().padding(horizontal=8.dp),horizontalArrangement=Arrangement.spacedBy(4.dp)) {
+    listOf<MapPlaceKind?>(null,MapPlaceKind.COURSE,MapPlaceKind.REST,MapPlaceKind.PHOTO).forEach { kind ->
+     TextButton(onClick={filter=kind},modifier=Modifier.weight(1f).heightIn(min=48.dp),contentPadding=PaddingValues(2.dp),
+      colors=ButtonDefaults.textButtonColors(contentColor=if(filter==kind)Coral else Muted)) { Text(kind?.label?:"전체",fontSize=14.sp,fontWeight=if(filter==kind)FontWeight.Bold else FontWeight.Normal) }
+    }
+   }
+   if(shown.isEmpty())Text("이 코스에는 출처를 확인한 사진 산책 장소가 아직 없어요.",fontSize=12.sp,color=Muted,modifier=Modifier.padding(horizontal=12.dp))
+   Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween){
+    if(BuildConfig.SIMULATOR)TextButton(onClick={failedMode=!failedMode}){Text(if(failedMode)"온라인으로" else "오프라인 체험",fontSize=12.sp)}
+    TextButton(onClick={openWeb(context,"https://www.openstreetmap.org/copyright")}){Text("© OpenStreetMap contributors",fontSize=12.sp,color=Ink)}
+   }
   }
+ }
+ if(listOpen||selected!=null) MapPlaceDialog(route,shown,selected,onSelect={selected=it},onDismiss={selected=null;listOpen=false},onBack={selected=null;listOpen=true})
+}
+@Composable private fun MapPlaceDialog(route:Route,places:List<MapPlace>,selected:MapPlace?,onSelect:(MapPlace)->Unit,onDismiss:()->Unit,onBack:()->Unit) {
+ val context=LocalContext.current
+ Dialog(onDismissRequest=onDismiss,properties=DialogProperties(usePlatformDefaultWidth=false)) {
+  val window=(androidx.compose.ui.platform.LocalView.current.parent as? androidx.compose.ui.window.DialogWindowProvider)?.window
+  DisposableEffect(window){val old=window?.attributes?.dimAmount;window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND);window?.setDimAmount(.64f);onDispose{if(old!=null)window?.setDimAmount(old)}}
+  Surface(Modifier.padding(24.dp).widthIn(max=720.dp).fillMaxWidth().heightIn(max=700.dp),color=White,shape=Corner,shadowElevation=24.dp){Column {
+   Row(Modifier.fillMaxWidth().padding(20.dp),verticalAlignment=Alignment.CenterVertically){
+    Text(selected?.name?:"${route.title} · 지도 속 장소",fontSize=24.sp,fontWeight=FontWeight.Bold,color=Ink,modifier=Modifier.weight(1f))
+    OutlinedButton(onClick=onDismiss,modifier=Modifier.heightIn(min=64.dp)){Text("닫기")}
+   }
+   HorizontalDivider()
+   Column(Modifier.weight(1f,false).verticalScroll(rememberScrollState()).padding(24.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
+    if(selected==null){
+     if(places.isEmpty())Text("이 필터에서 확인된 장소가 아직 없어요.",color=Ink,fontSize=19.sp)
+     Text("도로 기준점에서는 정차·촬영하지 마세요. 안전하게 주차한 뒤 장소 정보를 확인하세요.",color=Muted,fontSize=17.sp)
+     places.forEach { place ->
+      OutlinedButton(onClick={onSelect(place)},modifier=Modifier.fillMaxWidth().heightIn(min=76.dp),shape=Corner,contentPadding=PaddingValues(16.dp)){
+       Column(Modifier.fillMaxWidth()) {Text(place.name,fontSize=19.sp,color=Ink);Text(place.kinds.joinToString(" · "){it.label}+if(place.selectedRest)" · 가족 계획에 선택됨" else "",fontSize=14.sp,color=Muted)}
+      }
+     }
+    } else {
+     Text(selected.kinds.joinToString(" · "){it.label}+if(selected.selectedRest)" · 가족 계획에 선택됨" else "",color=Coral,fontSize=17.sp)
+     Text(selected.description,fontSize=19.sp,lineHeight=29.sp,color=Ink)
+     Text("사진 장소 선택은 경로·휴식 시간을 자동 변경하지 않습니다. 휴식 계획은 가족 비교에서 편집하세요.",fontSize=15.sp,color=Muted)
+     selected.source?.let { source -> OutlinedButton(onClick={openWeb(context,source)},modifier=Modifier.fillMaxWidth().heightIn(min=64.dp)){Text("공식 안내 확인 ↗",fontSize=18.sp)} }
+     TextButton(onClick=onBack,modifier=Modifier.heightIn(min=64.dp)){Text("← 장소 목록",fontSize=18.sp)}
+    }
+   }
+  }}
  }
 }
