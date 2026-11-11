@@ -50,14 +50,14 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-internal val Ink = Color(0xFF202720)
-internal val Paper = Color(0xFFF4F5F2)
+internal val Ink = Color(0xFF292B2A)
+internal val Paper = Color(0xFFF2F2EF)
 internal val White = Color(0xFFFFFFFF)
-internal val Muted = Color(0xFF6D756E)
-internal val Line = Color(0xFFE0E5DF)
-internal val Sage = Color(0xFFE8F0EA)
+internal val Muted = Color(0xFF686761)
+internal val Line = Color(0xFFD8D5CC)
+internal val Sage = Color(0xFFE9E9E5)
 internal val Amber = Color(0xFFBBDEB5)
-internal val Coral = Color(0xFF176B4D)
+internal val Coral = Color(0xFF9C452D)
 internal val Mono = FontFamily.Monospace
 internal val Corner = RoundedCornerShape(12.dp)
 
@@ -134,18 +134,13 @@ class MainActivity : ComponentActivity() {
             val wide = maxWidth >= 1100.dp
             val compact = maxHeight < 740.dp
             val heroHeight = (maxHeight * .34f).coerceIn(360.dp, 400.dp)
-            Row(Modifier.fillMaxSize()) {
+            Column(Modifier.fillMaxSize()) {
                 Sidebar(page, engine.canEdit, engine.snapshot, wide, compact,
                     onPage = { page = it; message = "" }, onDebug = { debug = true })
-                Box(Modifier.weight(1f).fillMaxHeight()) {
+                Box(Modifier.weight(1f).fillMaxWidth()) {
                     if (!engine.canEdit) SafetyPage(engine.safety, engine.snapshot.trip)
                     else Column(Modifier.fillMaxSize().verticalScroll(pageScroll)
                         .padding(horizontal = if (wide) 36.dp else 24.dp, vertical = 30.dp)) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(bottom = 18.dp)) {
-                            OutlinedButton(onClick = { page = "family"; message = "" }) { Text("가족 조건 · 코스 비교") }
-                            OutlinedButton(onClick = { page = "family-memory"; message = "" }) { Text("가족 차 기억 · 피드백") }
-                            OutlinedButton(onClick = { page = "auto-eta"; message = "" }) { Text("자동 왕복 시간") }
-                        }
                         when (page) {
                             "auto-eta" -> AutoEtaPage(onCurrentPoint={connections.currentPlanningPoint()},onCanCalculate={engine.canEdit},
                                 onApply={value->var ok=false;act { if(engine.canEdit)ok=familyEngine.plan(value.routeId,withEta(familyEngine.snapshot.plans[value.routeId]?:FamilyPlan(),value),engine.safety) };ok},
@@ -192,7 +187,7 @@ class MainActivity : ComponentActivity() {
                         Spacer(Modifier.height(26.dp))
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text("실제 장소·지도 · 방문/주행은 모의 체험 · 운전 중 조작 금지", color = Muted, fontSize = 13.sp)
-                            Text("DRIVE ATLAS / ROUNDTRIP 09", color = Muted, fontFamily = Mono, fontSize = 12.sp)
+                            Text("Drive Atlas", color = Muted, fontSize = 13.sp)
                         }
                         Spacer(Modifier.height(if (message.isNotBlank()) 72.dp else 8.dp))
                     }

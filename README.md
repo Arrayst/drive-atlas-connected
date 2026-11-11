@@ -34,11 +34,11 @@ Use an existing authorized PLEOS emulator; proprietary emulator images and SDK-s
 
 ## Run and verify
 
-Install the debug APK with `adb install -r` on the selected emulator. Open DRIVE ATLAS Connected. The app unlocks only after actual emulator P/UX checks succeed. Family planning and memories are available above the original three category cards.
+Install the debug APK with `adb install -r` on the selected emulator. Open DRIVE ATLAS Connected. The app unlocks only after actual emulator P/UX checks succeed. The task bar opens the route-index/map workbench, family comparison, road ETA, local journal, prior visits and stamp atlas. Category filters remain below the route index.
 
 The native navigation dialog exposes both full-course and individual-leg actions. Each action clearly warns that the emulator navigation route may change. Select a later leg only after safely parking. Leg selection is manual, not an automatic whole-course itinerary or a visit award.
 
-Tests cover safety, location evidence, restore validation, ranking, scoped facilities, nullable transfer time, persistence failure, record capacity, and fresh navigation callback evidence. Emulator replay scripts live under `tools/qa-family-v08.py`, `tools/qa-native-v08.py` and `tools/qa-native-legs.py`. These scripts interact with a running test emulator and may add explicitly simulated records or change its navigation route; do not run them against a real vehicle.
+Tests cover safety, location evidence, restore validation, ranking, scoped facilities, nullable transfer time, persistence failure, record capacity, and fresh navigation callback evidence. The current presentation smoke test is `tools/qa-design-workbench.py`; it opens retained flows and cancels edit/delete dialogs without saving records or requesting navigation. Older replay scripts use their version-specific labels. Emulator replay scripts live under `tools/qa-family-v08.py`, `tools/qa-native-v08.py` and `tools/qa-native-legs.py`. These scripts interact with a running test emulator and may add explicitly simulated records or change its navigation route; do not run them against a real vehicle.
 
 ## Important limits
 
@@ -47,6 +47,8 @@ Tests cover safety, location evidence, restore validation, ranking, scoped facil
 - The installed native provider returns `(0,0)` for full-course waypoint coordinates despite correct names and a matching final destination. The app deliberately does not certify that full request. Single-destination navigation is handled separately; see the latest verification report.
 - Emulator GPS or navigation is not physical driving or proof of a visit.
 - No cloud accounts, payments, partner contracts, production signing, store publication or physical-vehicle certification is claimed.
+
+Design rationale and source adaptation: [Native atlas workbench](docs/NATIVE_ATLAS_DESIGN.md).
 
 Details and test results: [Round trip 0.9](docs/ROUNDTRIP_V09.md), [vehicle/release readiness](docs/VEHICLE_RELEASE_READINESS.md), [Family 0.8](docs/FAMILY_V08.md), [native-provider investigation](docs/NATIVE_NAVIGATION_V08.md), [prior connected integration](docs/PLEOS_CONNECTED_V05.md).
 
