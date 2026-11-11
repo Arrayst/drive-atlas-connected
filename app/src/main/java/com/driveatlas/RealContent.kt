@@ -49,7 +49,7 @@ internal fun directionsUrl(route:Route):String = "https://map.kakao.com/link/by/
 internal fun regionFor(route:Route)=when(route.id){"coast"->"강릉";"forest"->"담양";else->"춘천"}
 @Composable internal fun RoadStats(route:Route){val c=LocalContext.current;val r=remember(route.id){readRoad(c,route.id)};Text(String.format(Locale.KOREA,"%.1f km · 주행 약 %.0f분",r.meters/1000,r.seconds/60),fontSize=22.sp,fontWeight=FontWeight.Bold,color=Ink);Text("OSRM 추정 · 정차·교통상황 제외",fontSize=13.sp,color=Muted)}
 @Composable internal fun PhotoAttribution(route:Route){val c=LocalContext.current;val p=photoCredit(route);Text(p.caption,fontSize=13.sp,color=Muted);TextButton(onClick={openWeb(c,p.source)},contentPadding=PaddingValues(0.dp)){Text("사진: ${p.author} · ${p.license} ↗",fontSize=12.sp)}}
-@Composable internal fun RealNavigationDialog(route:Route,nativeStatus:String,onNativeSearch:()->Unit,onNativeRoute:()->Unit,onNativeOpen:()->Unit,onDismiss:()->Unit,onStart:()->Unit){
+@Composable internal fun RealNavigationDialog(route:Route,nativeStatus:String,onNativeSearch:()->Unit,onNativeRoute:()->Unit,onNativeOpen:()->Unit,onNativeLeg:(Int)->Unit,onDismiss:()->Unit,onStart:()->Unit){
  val context=LocalContext.current
  Dialog(onDismissRequest=onDismiss,properties=DialogProperties(usePlatformDefaultWidth=false)){
   Surface(Modifier.widthIn(max=850.dp).padding(24.dp),color=Paper,shape=Corner){Column(Modifier.verticalScroll(rememberScrollState()).padding(32.dp)){
@@ -60,6 +60,11 @@ internal fun regionFor(route:Route)=when(route.id){"coast"->"강릉";"forest"->"
    Spacer(Modifier.height(12.dp));SecondaryButton("공개 좌표 코스 전달 · 실험",onNativeRoute,Modifier.fillMaxWidth())
    Text("코스 시작점과 경유지, 도착점을 기본 내비에 보냅니다. POI ID 없는 좌표 요청은 서비스가 거절할 수 있으며 완료 콜백과 좌표 대조 전에는 성공으로 처리하지 않습니다. 기존 내비 경로가 변경될 수 있어요.",fontSize=14.sp,color=Muted,modifier=Modifier.padding(vertical=10.dp))
    SecondaryButton("기본 내비 화면 보기",onNativeOpen,Modifier.fillMaxWidth())
+   Spacer(Modifier.height(18.dp));Text("구간별 내비 · 목적지 하나씩",fontSize=22.sp,fontWeight=FontWeight.Bold)
+   Text("전체 경유지 확인이 안 될 때 각 지점을 목적지로 연결합니다. 도착 후 안전하게 주차한 다음 구간을 선택하세요. 자동 구간 전환·전체 코스 완료 인증은 아닙니다. 기존 내비 경로가 바뀝니다.",fontSize=14.sp,color=Muted,modifier=Modifier.padding(vertical=10.dp))
+   route.stops.forEachIndexed{index,stop->
+    SecondaryButton("${index+1}. ${stop.name}까지 안내",{onNativeLeg(index)},Modifier.fillMaxWidth().padding(bottom=8.dp))
+   }
    Spacer(Modifier.height(22.dp));PrimaryButton("카카오맵에서 코스 열기  ↗",{openWeb(context,directionsUrl(route))},Modifier.fillMaxWidth())
    Text("앱 안 웹 보기에서는 ‘설치없이 지도보기’를 선택하세요. 외부 지도에서 재탐색하므로 화면의 코스와 달라질 수 있습니다. 차량 내비나 우표 여정은 시작하지 않습니다.",fontSize=14.sp,color=Muted,modifier=Modifier.padding(top=10.dp,bottom=20.dp))
    SecondaryButton("OSM에서 도착지 보기  ↗",{openWeb(context,destinationUrl(route))},Modifier.fillMaxWidth())

@@ -7,7 +7,7 @@ android {
  namespace = "com.driveatlas"
  compileSdk = 35
  useLibrary("android.car")
- defaultConfig { applicationId = "com.driveatlas.connected"; minSdk = 28; targetSdk = 35; versionCode = 6; versionName = "0.6.0-cards-gps" }
+ defaultConfig { applicationId = "com.driveatlas.connected"; minSdk = 28; targetSdk = 35; versionCode = 8; versionName = "0.8.0-family-complete" }
  buildTypes { debug { applicationIdSuffix = ".emulator"; buildConfigField("boolean", "SIMULATOR", "true") }; release { buildConfigField("boolean", "SIMULATOR", "false") } }
  compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
  kotlinOptions { jvmTarget = "17" }

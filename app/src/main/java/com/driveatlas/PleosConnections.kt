@@ -31,7 +31,7 @@ internal data class ConnectionState(
 )
 
 /** SDK events are real IPC, but an emulator is not a real vehicle or visit certificate. */
-internal class PleosConnections(private val context: Context, private val changed: (ConnectionState) -> Unit) {
+internal class PleosConnections(private val context: Context, private val vehicleOnly: Boolean = false, private val changed: (ConnectionState) -> Unit) {
     companion object { const val LOCATION_PERMISSION = "pleos.car.permission.FUSED_LOCATION" }
     private val handler = Handler(Looper.getMainLooper())
     var state = ConnectionState(); private set
@@ -54,9 +54,7 @@ internal class PleosConnections(private val context: Context, private val change
     private var pendingRoute: Route? = null
     private var routeConfirmed = false
     private var routeStarted = false
-    private var routeCompleted = false
-    private var destinationVerified = false
-    private var waypointsVerified = false
+    private var routeVerification: NativeRouteVerification? = null
     private var fused: FusedLocation? = null
     private var locationReceivedAt = 0L
     private fun post(block: () -> Unit) { handler.post { if (!destroyed) block() } }
@@ -116,8 +114,7 @@ internal class PleosConnections(private val context: Context, private val change
             } }
         } catch (error: Exception) { updateSafety("차량 서비스 없음: ${error.javaClass.simpleName}") }
         handler.post(poll)
-        connectNavigation()
-        connectLocationIfGranted()
+        if (!vehicleOnly) { connectNavigation(); connectLocationIfGranted() }
     }
     private fun refreshVehicle() {
         if (!active || refreshPending) return
@@ -181,21 +178,36 @@ internal class PleosConnections(private val context: Context, private val change
             if (pendingRoute == null && !routeConfirmed) nav("내비 경로 상태 콜백 수신 · 서비스 응답 확인")
         } }
         override fun onDestinationChanged() { post {
+            routeVerification?.invalidateDestination()
             if (pendingRoute == null) { routeConfirmed = false; nav("내비 목적지 변경됨 · 코스 대조 다시 필요") }
+        } }
+        override fun onWaypointChanged(waypointChangedInfo: WaypointChangedInfo) { post {
+            routeVerification?.invalidateWaypoints()
+            if (pendingRoute == null) { routeConfirmed = false; nav("내비 경유지 변경됨 · 코스 대조 다시 필요") }
         } }
         override fun onRouteStarted(routeStartInfo: RouteStartInfo) { post { if (pendingRoute != null) { routeStarted = true; nav("내비가 경로 탐색 시작을 알림 · 완료 대기") } } }
         @Suppress("OVERRIDE_DEPRECATION")
         override fun onRouteEnded() { onRoutingCompleted() } // Installed 3.0.4 provider emits the legacy completion event.
-        override fun onRoutingCompleted() { post { if (pendingRoute != null) { routeCompleted = true; nav("내비 경로 탐색 완료 콜백 · 목적지/경유지 대조 중"); navi?.getDestinationInfo(); navi?.getWaypointInfo(); checkRouteResult() } } }
+        override fun onRoutingCompleted() { post { if (pendingRoute != null) {
+            routeVerification?.complete()
+            nav("내비 경로 탐색 완료 콜백 · 목적지/경유지 대조 중")
+            try {
+                val helper = checkNotNull(navi)
+                helper.getDestinationInfo(); helper.getWaypointInfo()
+            } catch (error: Exception) {
+                requestToken++; pendingRoute = null; routeConfirmed = false
+                nav("내비 경로 정보 조회 실패: ${error.javaClass.simpleName} · 코스 확인 보류")
+            }
+        } } }
         override fun onDestinationInfo(destinationInfo: DestinationInfo) { post { pendingRoute?.let { route ->
-            destinationVerified = samePoint(route.stops.last().point, destinationInfo.latitude, destinationInfo.longitude)
-            Log.i("AtlasConnection", "destination check: expectedLast=$destinationVerified, matchedCourseIndex=${route.stops.indexOfFirst { samePoint(it.point, destinationInfo.latitude, destinationInfo.longitude) }}")
+            val point = Point(destinationInfo.latitude, destinationInfo.longitude)
+            routeVerification?.destination(point)
+            Log.i("AtlasConnection", "destination check: expectedLast=${routeVerification?.destinationMatches}, matchedCourseIndex=${route.stops.indexOfFirst { nativePointMatches(it.point, point) }}")
             checkRouteResult()
         } } }
         override fun onWayPointInfo(waypointInfoList: List<WaypointInfo>) { post { pendingRoute?.let { route ->
-            val expected = route.stops.dropLast(1)
-            waypointsVerified = waypointInfoList.size == expected.size && expected.indices.all { i -> samePoint(expected[i].point, waypointInfoList[i].latitude, waypointInfoList[i].longitude) }
-            Log.i("AtlasConnection", "waypoint check: count=${waypointInfoList.size}, orderedMatch=$waypointsVerified, courseIndexes=${waypointInfoList.map { waypoint -> route.stops.indexOfFirst { samePoint(it.point, waypoint.latitude, waypoint.longitude) } }}")
+            routeVerification?.waypoints(waypointInfoList.map { Point(it.latitude, it.longitude) })
+            Log.i("AtlasConnection", "waypoint check: count=${waypointInfoList.size}, orderedMatch=${routeVerification?.waypointsMatch}, courseIndexes=${waypointInfoList.map { waypoint -> route.stops.indexOfFirst { nativePointMatches(it.point, Point(waypoint.latitude, waypoint.longitude)) } }}")
             checkRouteResult()
         } } }
         override fun onError(errorCode: NaviErrorCode) { post { requestToken++; pendingRoute = null; routeConfirmed = false; nav("내비 오류: ${errorCode.name} · 안내 성공 아님") } }
@@ -205,13 +217,12 @@ internal class PleosConnections(private val context: Context, private val change
             } else { requestToken++; pendingRoute = null; routeConfirmed = false; nav("내비 경로 취소 콜백 수신") }
         } }
     }
-    private fun samePoint(point: Point, lat: Double, lon: Double): Boolean {
-        val dlat = Math.toRadians(point.lat-lat); val dlon = Math.toRadians(point.lon-lon)
-        val a = kotlin.math.sin(dlat/2).let { it*it } + kotlin.math.cos(Math.toRadians(point.lat)) * kotlin.math.cos(Math.toRadians(lat)) * kotlin.math.sin(dlon/2).let { it*it }
-        return lat.isFinite() && lon.isFinite() && 6371000 * 2 * kotlin.math.atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1-a)) <= 100.0
-    }
     private fun checkRouteResult() {
-        if (routeCompleted && destinationVerified && waypointsVerified) { requestToken++; pendingRoute = null; routeConfirmed = true; nav("내비 경로 완료 · 목적지 + 경유지 2곳 좌표 대조 확인 (약 100m 이내)") }
+        if (routeVerification?.confirmed == true && pendingRoute != null) {
+            val count = pendingRoute!!.stops.size - 1
+            requestToken++; pendingRoute = null; routeConfirmed = true
+            nav(if(count==0) "선택 구간 내비 확인 · 목적지 좌표 일치 · 전체 코스 연속 안내 아님" else "내비 경로 완료 · 목적지 + 경유지 ${count}곳 좌표 대조 확인 (약 100m 이내)")
+        }
     }
     private fun connectNavigation() {
         if (navi != null) return
@@ -243,11 +254,19 @@ internal class PleosConnections(private val context: Context, private val change
             } else nav("열 수 있는 기본 내비 앱을 찾지 못함")
         } catch (error: Exception) { nav("내비 앱 열기 실패: ${error.javaClass.simpleName}") }
     }
+    fun requestNativeLeg(route: Route, index: Int) {
+        val stop=route.stops.getOrNull(index) ?: return
+        requestNativeRoute(route.copy(id=route.id+"-leg-"+index,title=route.title+" · "+(index+1)+"구간",stops=listOf(stop)))
+    }
     fun requestNativeRoute(route: Route) {
         if (pendingRoute != null) { nav("이전 코스 요청 응답 대기 중 · 중복 요청하지 않음"); return }
         if (state.safety != Safety.PARKED || !naviReady) { nav("주차 확인 및 내비 연결이 필요합니다"); return }
+        if (route.stops.size !in 1..3 || route.stops.any { !validNativePoint(it.point) }) {
+            nav("유효한 목적지와 최대 경유지 2곳이 필요합니다 · 요청하지 않음"); return
+        }
         val token = ++requestToken
-        pendingRoute = route; routeConfirmed = false; routeStarted = false; routeCompleted = false; destinationVerified = false; waypointsVerified = false
+        pendingRoute = route; routeConfirmed = false; routeStarted = false
+        routeVerification = NativeRouteVerification(route.stops.map { it.point })
         val destination = route.stops.last()
         // Public road coordinates only. Empty IDs are not fabricated POIs; support must be confirmed by callbacks.
         val request = RouteWithWaypointsRequest(RouteInfo(latitude = destination.point.lat, longitude = destination.point.lon,
@@ -255,12 +274,13 @@ internal class PleosConnections(private val context: Context, private val change
             route.stops.dropLast(1).mapIndexed { i, stop -> RequestWaypointInfo(latitude = stop.point.lat, longitude = stop.point.lon,
                 poiName = stop.name, waypointIndex = if (i == 0) WaypointIndex.FIRST else WaypointIndex.SECOND,
                 poiId = "", address = "", poiSubId = "") })
-        nav("공개 좌표 코스 요청 중 · POI ID 없는 실험 연동 · 성공 미확인")
-        try { navi?.requestRouteWithWaypoints(request) }
+        nav(if(route.stops.size==1) "선택 구간 목적지 요청 중 · 완료·좌표 확인 대기" else "공개 좌표 코스 요청 중 · POI ID 없는 실험 연동 · 성공 미확인")
+        try { if(route.stops.size==1)navi?.requestRoute(request.destination) else navi?.requestRouteWithWaypoints(request) }
         catch (error: Exception) { pendingRoute = null; nav("내비 요청 실패: ${error.javaClass.simpleName}") }
         handler.postDelayed({ if (!destroyed && requestToken == token && pendingRoute != null) {
             pendingRoute = null
-            nav(if (routeCompleted) "내비 경로 생성 응답 수신 · 목적지 ${if(destinationVerified) "일치" else "미확인"} / 경유지 ${if(waypointsVerified) "일치" else "대조 불일치"} · 전체 코스 확인 보류"
+            fun result(value: Boolean?) = when (value) { true -> "일치"; false -> "대조 불일치"; null -> "응답 미확인" }
+            nav(if (routeVerification?.completed == true) "내비 경로 생성 응답 수신 · 목적지 ${result(routeVerification?.destinationMatches)} / 경유지 ${result(routeVerification?.waypointsMatch)} · 전체 코스 확인 보류"
                 else "30초 내 경로·목적지·경유지 확인 불가 · 안내 성공으로 처리하지 않음")
         } }, 30_000)
     }

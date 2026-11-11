@@ -6,4 +6,6 @@
  <string name="web_blocked">앱 설치 링크는 열지 않습니다. 지도 페이지의 ‘설치없이 지도보기’를 선택하세요.</string>
  <string name="web_loaded">%1$s · 외부 서비스 화면 · 실제 주행 시작 아님</string>
  <string name="web_error">웹 지도를 불러오지 못했어요. 인터넷 연결 또는 외부 서비스 지원을 확인해 주세요.</string>
+ <string name="web_lock_pending">주차 상태를 확인하는 동안 웹 탐색을 잠급니다.</string>
+ <string name="web_lock_unknown">P 기어와 UX 제한 해제를 확인한 뒤 웹 탐색을 사용할 수 있어요.</string>
 </resources>

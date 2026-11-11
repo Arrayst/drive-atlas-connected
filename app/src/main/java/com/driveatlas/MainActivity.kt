@@ -61,6 +61,7 @@ internal val Corner = RoundedCornerShape(12.dp)
 
 class MainActivity : ComponentActivity() {
     private lateinit var engine: AtlasEngine
+    private lateinit var familyEngine: FamilyEngine
     private var revision by mutableIntStateOf(0)
     private lateinit var connections: PleosConnections
     private var connectionState by mutableStateOf(ConnectionState())
@@ -71,6 +72,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         engine = AtlasEngine(LocalStore(this), if (BuildConfig.SIMULATOR) Mode.SIMULATOR else Mode.VEHICLE)
+        familyEngine = FamilyEngine(FamilyStore(this))
         connections = PleosConnections(this) { state ->
             connectionState = state
             engine.setSafety(state.safety)
@@ -137,7 +139,24 @@ class MainActivity : ComponentActivity() {
                     if (!engine.canEdit) SafetyPage(engine.safety, engine.snapshot.trip)
                     else Column(Modifier.fillMaxSize().verticalScroll(pageScroll)
                         .padding(horizontal = if (wide) 36.dp else 24.dp, vertical = 30.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(bottom = 18.dp)) {
+                            OutlinedButton(onClick = { page = "family"; message = "" }) { Text("가족 조건 · 코스 비교") }
+                            OutlinedButton(onClick = { page = "family-memory"; message = "" }) { Text("가족 차 기억 · 피드백") }
+                        }
                         when (page) {
+                            "family" -> FamilyPage(familyEngine.snapshot,
+                                onPreferences = { value -> act { familyEngine.preferences(value, engine.safety) } },
+                                onPlan = { id, plan -> act { familyEngine.plan(id, plan, engine.safety) } },
+                                onRoute = ::open, onMemory = { page = "family-memory" })
+                            "family-memory" -> FamilyMemoriesPage(familyEngine.snapshot,
+                                onSave = { id, route, rating, note, simulated ->
+                                    var saved = false
+                                    act { saved = familyEngine.remember(id, route, rating, note, System.currentTimeMillis(), engine.safety, simulated)
+                                        if (saved) message = if (simulated) "시연 기억을 저장했어요. 추천 평점에서는 제외합니다." else "가족의 기억을 저장하고 다음 추천에 평가를 반영했어요." }
+                                    saved
+                                }, onCompare = { page = "family" },
+                                onEdit = { id, rating, note -> var ok=false; act { ok=familyEngine.editMemory(id,rating,note,engine.safety) };ok },
+                                onDelete = { id -> var ok=false;act { ok=familyEngine.deleteMemory(id,engine.safety) };ok })
                             "discover" -> GuideHome(engine.snapshot, { curation = it; page = "curation" },
                                 onTrip = { page = "trip" }, onAtlas = { page = "atlas" }, onRoute = ::open, filters = filters)
                             "curation" -> CurationPage(curation, filters, engine.snapshot.awards, ::open, { page = "discover" })
@@ -167,7 +186,7 @@ class MainActivity : ComponentActivity() {
                         Spacer(Modifier.height(26.dp))
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text("실제 장소·지도 · 방문/주행은 모의 체험 · 운전 중 조작 금지", color = Muted, fontSize = 13.sp)
-                            Text("DRIVE ATLAS / CARDS + GPS 06", color = Muted, fontFamily = Mono, fontSize = 12.sp)
+                            Text("DRIVE ATLAS / FAMILY 08", color = Muted, fontFamily = Mono, fontSize = 12.sp)
                         }
                         Spacer(Modifier.height(if (message.isNotBlank()) 72.dp else 8.dp))
                     }
@@ -187,7 +206,7 @@ class MainActivity : ComponentActivity() {
         })
         if (engine.canEdit && navDialog) RealNavigationDialog(selected, connectionState.navigation,
             onNativeSearch = { connections.openNativeSearch(selected) }, onNativeRoute = { connections.requestNativeRoute(selected) },
-            onNativeOpen = { connections.showNative() }, onDismiss = { navDialog = false }, onStart = {
+            onNativeOpen = { connections.showNative() }, onNativeLeg = { index -> connections.requestNativeLeg(selected,index) }, onDismiss = { navDialog = false }, onStart = {
             act { engine.setLocation(LocationStatus.AVAILABLE); if (engine.start(selected.id, System.currentTimeMillis())) { navDialog = false; page = "trip"; message = "모의 여정을 시작했어요. 실제 내비 안내나 방문 인증은 아닙니다." } }
         })
         if (engine.canEdit && archiveDialog) ArchiveDialog(onDismiss = { archiveDialog = false }) { status ->

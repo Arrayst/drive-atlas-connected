@@ -7,3 +7,12 @@ local.properties
 
 .kotlin/
 dist/
+
+# Local SDK inspection and raw emulator evidence
+tools/sdk-inspect/
+tools/__pycache__/
+evidence/cards-gps-v06/
+evidence/family-v07/
+evidence/family-v08/
+evidence/live-v05/
+evidence/native-legs-v08/
