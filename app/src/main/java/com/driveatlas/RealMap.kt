@@ -47,8 +47,8 @@ internal fun fittedViewport(points:List<Point>,width:Int,height:Int,extraZoom:In
  zoom=(zoom+extraZoom).coerceIn(8,16);val ps=points.map{worldPoint(it,zoom)}
  return MapViewport(zoom,(ps.minOf{it.first}+ps.maxOf{it.first})/2-width/2,(ps.minOf{it.second}+ps.maxOf{it.second})/2-height/2,width,height)
 }
-private data class MapTile(val x:Int,val y:Int,val image:ImageBitmap?)
-private suspend fun loadVisibleTiles(context:Context,v:MapViewport):List<MapTile> = withContext(Dispatchers.IO) {
+internal data class MapTile(val x:Int,val y:Int,val image:ImageBitmap?)
+internal suspend fun loadVisibleTiles(context:Context,v:MapViewport):List<MapTile> = withContext(Dispatchers.IO) {
  if(HttpResponseCache.getInstalled()==null)runCatching { HttpResponseCache.install(File(context.cacheDir,"osm-http"),32L*1024*1024) }
  val result=mutableListOf<MapTile>()
  for(y in floor(v.top/256).toInt()..floor((v.top+v.height-1)/256).toInt())for(x in floor(v.left/256).toInt()..floor((v.left+v.width-1)/256).toInt()){

@@ -22,3 +22,9 @@ evidence/eta-v10/
 
 # Local in-app map validation captures
 evidence/map-v11/
+
+# Local navigation prototype QA
+evidence/nav-prototype-v12/
+
+# Local speech QA captures and device logs
+evidence/nav-voice-v12/

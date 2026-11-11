@@ -1,11 +1,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
  <uses-permission android:name="android.permission.INTERNET"/>
+ <uses-permission android:name="pleos.car.permission.TTS_SERVICE"/>
  <uses-permission android:name="android.car.permission.CAR_POWERTRAIN"/>
  <uses-permission android:name="pleos.car.permission.NAVI_ROUTE"/>
  <uses-permission android:name="pleos.car.permission.NAVI_ROUTE_SEARCH"/>
  <uses-permission android:name="pleos.car.permission.NAVI_CUSTOM_MAP"/>
  <uses-permission android:name="pleos.car.permission.FUSED_LOCATION"/>
- <queries><package android:name="net.daum.android.map"/><package android:name="ai.pleos.playground.service.location.fused"/><package android:name="ai.umos.maps.android.navigation.app"/><intent><action android:name="android.intent.action.VIEW"/><data android:scheme="https"/></intent></queries>
+ <queries><package android:name="ai.pleos.playground.caas"/><package android:name="net.daum.android.map"/><package android:name="ai.pleos.playground.service.location.fused"/><package android:name="ai.umos.maps.android.navigation.app"/><intent><action android:name="android.intent.action.VIEW"/><data android:scheme="https"/></intent><intent><action android:name="android.intent.action.TTS_SERVICE"/></intent></queries>
  <application android:icon="@mipmap/ic_atlas" android:roundIcon="@mipmap/ic_atlas" android:label="DRIVE ATLAS Connected" android:theme="@android:style/Theme.Material.NoActionBar" android:allowBackup="false" android:supportsRtl="true">
   <uses-library android:name="android.car" android:required="false"/>
   <activity android:name=".PublicWebActivity" android:exported="false"/>

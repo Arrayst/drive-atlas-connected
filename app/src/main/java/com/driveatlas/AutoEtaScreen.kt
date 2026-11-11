@@ -20,7 +20,8 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-@Composable internal fun AutoEtaPage(snapshot:FamilySnapshot,onCurrentPoint:()->Point?,onCanCalculate:()->Boolean,onApply:(EtaEstimate)->Boolean,onFamily:()->Unit) {
+@Composable internal fun AutoEtaPage(snapshot:FamilySnapshot,onCurrentPoint:()->Point?,onCanCalculate:()->Boolean,onApply:(EtaEstimate)->Boolean,onFamily:()->Unit,onPrototype:(()->Unit)?=null) {
+ if(BuildConfig.DEBUG&&BuildConfig.SIMULATOR&&onPrototype!=null)OutlinedButton(onClick=onPrototype,modifier=Modifier.heightIn(min=72.dp)){Text("앱 안에서 전체 경로 따라보기 · SIM",fontSize=20.sp)}
  val context=LocalContext.current;val cache=remember{EtaCache(context)};val scope=rememberCoroutineScope()
  var routeId by remember{mutableStateOf(Catalog.routes.first().id)}
  var originId by remember{mutableStateOf<String?>(DepartureReferences.all.first().id)}

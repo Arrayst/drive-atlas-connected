@@ -142,9 +142,10 @@ class MainActivity : ComponentActivity() {
                     else Column(Modifier.fillMaxSize().verticalScroll(pageScroll)
                         .padding(horizontal = if (wide) 36.dp else 24.dp, vertical = 30.dp)) {
                         when (page) {
+                            "prototype-nav" -> PrototypeNavigationPage(familyEngine.snapshot,onCanRun={engine.canEdit&&connectionState.emulator},onBack={page="auto-eta"})
                             "auto-eta" -> AutoEtaPage(snapshot=familyEngine.snapshot,onCurrentPoint={connections.currentPlanningPoint()},onCanCalculate={engine.canEdit},
                                 onApply={value->var ok=false;act { if(engine.canEdit)ok=familyEngine.plan(value.routeId,withEta(familyEngine.snapshot.plans[value.routeId]?:FamilyPlan(),value),engine.safety) };ok},
-                                onFamily={page="family"})
+                                onFamily={page="family"},onPrototype=if(BuildConfig.DEBUG&&connectionState.emulator)({page="prototype-nav"}) else null)
                             "family" -> FamilyPage(familyEngine.snapshot,
                                 onPreferences = { value -> var ok=false;act { ok=familyEngine.preferences(value, engine.safety) };ok },
                                 onPlan = { id, plan -> var ok=false;act { ok=familyEngine.plan(id, plan, engine.safety) };ok },

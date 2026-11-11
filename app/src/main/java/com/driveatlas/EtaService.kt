@@ -15,7 +15,6 @@ import org.json.JSONObject
 /** Explicit requests only, one shared serial queue, no private coordinates cached or logged. */
 internal object EtaService {
  private val worker=Executors.newSingleThreadExecutor()
- private var lastStart=0L
  suspend fun calculate(request:EtaRequest):EtaEstimate=suspendCancellableCoroutine{continuation->
   val connection=AtomicReference<HttpURLConnection?>()
   continuation.invokeOnCancellation{connection.get()?.disconnect()}
@@ -23,14 +22,12 @@ internal object EtaService {
    if(!continuation.isActive)return@execute
    try {
     if(!BuildConfig.DEBUG)throw EtaUnavailable("ProductionProviderRequired")
-    val wait=1100-(System.nanoTime()-lastStart)/1_000_000
-    if(wait>0)Thread.sleep(wait)
+    PublicRoutingThrottle.awaitTurn()
     if(!continuation.isActive)return@execute
     val conn=URL(etaUrl(request)).openConnection() as HttpURLConnection;connection.set(conn)
     if(!continuation.isActive){conn.disconnect();return@execute}
     conn.instanceFollowRedirects=false;conn.connectTimeout=8000;conn.readTimeout=12000
     conn.setRequestProperty("User-Agent","DriveAtlasPrototype/0.9 (Android; private noncommercial test; https://github.com/Arrayst/drive-atlas-connected)")
-    lastStart=System.nanoTime()
     val status=conn.responseCode
     if(status==429)throw EtaUnavailable("RateLimit")
     if(status!=200&&status!=400)throw EtaUnavailable("Network")
