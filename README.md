@@ -1,8 +1,10 @@
-# DRIVE ATLAS · Family 0.8
+# DRIVE ATLAS · Family + Round Trip 0.9
 
 Native Kotlin/Compose Android app for the Hyundai PLEOS emulator: family conditions → course and rest planning → navigation handoff → family-car memories and feedback → next recommendation.
 
 ## Implemented
+
+- Consent-gated road-based round trips: departure → all course stops → departure, with independent outbound/course/return legs, explicit family-plan application and public-reference-only 24-hour cache.
 
 - Three real Korean courses with licensed photos, bundled road geometry and OSM preview.
 - Family time/walking preferences; separate outbound/return planning estimates; explicit unknown handling.
@@ -10,7 +12,7 @@ Native Kotlin/Compose Android app for the Hyundai PLEOS emulator: family conditi
 - Native navigation search, experimental full-course request, and explicit single-destination course-leg requests. Request submission alone is never displayed as verified guidance.
 - Private local memories tied to a car nickname, rating, notes, edit/delete confirmation and feedback-based ranking. Simulated memories are labelled and excluded from normal ratings. Old records are not silently removed when storage reaches its stated 500-record limit.
 - Authoritative P gear and platform UX restrictions gate both the app and its internal public web viewer. Missing/stale signals fail closed. No manual park override.
-- Local-only approved GPS proximity checks; no physical visit certification or current-location transmission to external map servers.
+- Local-only approved GPS proximity checks; no physical visit certification or automatic current-location transmission to external map servers.
 
 ## Build
 
@@ -40,13 +42,13 @@ Tests cover safety, location evidence, restore validation, ranking, scoped facil
 
 ## Important limits
 
-- Outbound/return values are user-entered estimates, not real-time traffic ETAs.
+- Outbound/return values may be manually entered or explicitly calculated from road routes. Neither includes real-time traffic. The public routing server is debug-only, small noncommercial prototype infrastructure; production needs a suitable provider.
 - Public facility facts are not live availability or whole-road accessibility guarantees.
 - The installed native provider returns `(0,0)` for full-course waypoint coordinates despite correct names and a matching final destination. The app deliberately does not certify that full request. Single-destination navigation is handled separately; see the latest verification report.
 - Emulator GPS or navigation is not physical driving or proof of a visit.
 - No cloud accounts, payments, partner contracts, production signing, store publication or physical-vehicle certification is claimed.
 
-Details and test results: [Family 0.8](docs/FAMILY_V08.md), [native-provider investigation](docs/NATIVE_NAVIGATION_V08.md), [prior connected integration](docs/PLEOS_CONNECTED_V05.md).
+Details and test results: [Round trip 0.9](docs/ROUNDTRIP_V09.md), [vehicle/release readiness](docs/VEHICLE_RELEASE_READINESS.md), [Family 0.8](docs/FAMILY_V08.md), [native-provider investigation](docs/NATIVE_NAVIGATION_V08.md), [prior connected integration](docs/PLEOS_CONNECTED_V05.md).
 
 ## Data and licenses
 

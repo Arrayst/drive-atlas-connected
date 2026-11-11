@@ -65,5 +65,5 @@ class PublicWebActivity:ComponentActivity(){
 }
 internal fun safePublicUrl(value:String):Boolean=runCatching{
  val u=java.net.URI(value);val host=u.host?:return@runCatching false
- u.scheme=="https" && u.userInfo==null && (host=="map.kakao.com"||host.endsWith(".kakao.com")||host=="www.openstreetmap.org"||host=="commons.wikimedia.org"||host=="creativecommons.org"||host=="operations.osmfoundation.org"||host=="korean.visitkorea.or.kr"||host=="access.visitkorea.or.kr"||host=="searoad.gtdc.or.kr")
+ u.scheme=="https" && u.userInfo==null && (host=="map.kakao.com"||host.endsWith(".kakao.com")||host=="www.openstreetmap.org"||host=="commons.wikimedia.org"||host=="creativecommons.org"||host=="operations.osmfoundation.org"||host=="korean.visitkorea.or.kr"||host=="access.visitkorea.or.kr"||host=="searoad.gtdc.or.kr"||host=="project-osrm.org"||host=="routing.openstreetmap.de")
 }.getOrDefault(false)

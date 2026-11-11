@@ -17,6 +17,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -142,8 +144,12 @@ class MainActivity : ComponentActivity() {
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(bottom = 18.dp)) {
                             OutlinedButton(onClick = { page = "family"; message = "" }) { Text("가족 조건 · 코스 비교") }
                             OutlinedButton(onClick = { page = "family-memory"; message = "" }) { Text("가족 차 기억 · 피드백") }
+                            OutlinedButton(onClick = { page = "auto-eta"; message = "" }) { Text("자동 왕복 시간") }
                         }
                         when (page) {
+                            "auto-eta" -> AutoEtaPage(onCurrentPoint={connections.currentPlanningPoint()},onCanCalculate={engine.canEdit},
+                                onApply={value->var ok=false;act { if(engine.canEdit)ok=familyEngine.plan(value.routeId,withEta(familyEngine.snapshot.plans[value.routeId]?:FamilyPlan(),value),engine.safety) };ok},
+                                onFamily={page="family"})
                             "family" -> FamilyPage(familyEngine.snapshot,
                                 onPreferences = { value -> act { familyEngine.preferences(value, engine.safety) } },
                                 onPlan = { id, plan -> act { familyEngine.plan(id, plan, engine.safety) } },
@@ -186,7 +192,7 @@ class MainActivity : ComponentActivity() {
                         Spacer(Modifier.height(26.dp))
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text("실제 장소·지도 · 방문/주행은 모의 체험 · 운전 중 조작 금지", color = Muted, fontSize = 13.sp)
-                            Text("DRIVE ATLAS / FAMILY 08", color = Muted, fontFamily = Mono, fontSize = 12.sp)
+                            Text("DRIVE ATLAS / ROUNDTRIP 09", color = Muted, fontFamily = Mono, fontSize = 12.sp)
                         }
                         Spacer(Modifier.height(if (message.isNotBlank()) 72.dp else 8.dp))
                     }
@@ -572,12 +578,16 @@ class MainActivity : ComponentActivity() {
     Text(text, modifier.background(background, RoundedCornerShape(4.dp)).padding(horizontal = 11.dp, vertical = 7.dp), color = foreground, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = .3.sp)
 }
 @Composable internal fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
-    Button(onClick = onClick, enabled = enabled, modifier = modifier.heightIn(min = 57.dp), shape = RoundedCornerShape(7.dp), contentPadding = PaddingValues(horizontal = 20.dp, vertical = 13.dp), colors = ButtonDefaults.buttonColors(containerColor = Ink, contentColor = White, disabledContainerColor = Sage, disabledContentColor = Muted)) {
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
+    Button(onClick = onClick, enabled = enabled, interactionSource = interaction, border = if(focused) BorderStroke(3.dp, Color(0xFF55DDB4)) else null, modifier = modifier.heightIn(min = 57.dp), shape = RoundedCornerShape(7.dp), contentPadding = PaddingValues(horizontal = 20.dp, vertical = 13.dp), colors = ButtonDefaults.buttonColors(containerColor = Ink, contentColor = White, disabledContainerColor = Sage, disabledContentColor = Muted)) {
         Text(text, fontSize = 17.sp, fontWeight = FontWeight.Bold)
     }
 }
 @Composable internal fun SecondaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    OutlinedButton(onClick = onClick, modifier = modifier.heightIn(min = 56.dp), shape = RoundedCornerShape(7.dp), border = BorderStroke(1.dp, Line), contentPadding = PaddingValues(horizontal = 17.dp, vertical = 13.dp)) { Text(text, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Ink) }
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
+    OutlinedButton(onClick = onClick, interactionSource = interaction, modifier = modifier.heightIn(min = 56.dp), shape = RoundedCornerShape(7.dp), border = BorderStroke(if(focused) 3.dp else 1.dp, if(focused) Color(0xFF005FCC) else Line), contentPadding = PaddingValues(horizontal = 17.dp, vertical = 13.dp)) { Text(text, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Ink) }
 }
 @Composable internal fun PixelIcon(name: String, color: Color, modifier: Modifier = Modifier) {
     val rows = when (name) {

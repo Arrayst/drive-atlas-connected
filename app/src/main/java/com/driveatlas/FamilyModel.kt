@@ -9,9 +9,12 @@ data class FamilyPreferences(
  fun valid() = availableMinutes in 30..720 && walkMinutes in 0..120 && carName.isNotBlank() && carName.length <= 24
 }
 data class FamilyPlan(val restMinutes: Int = 60, val walkMinutes: Int = 20,
- val outboundMinutes: Int? = null, val returnMinutes: Int? = null, val restFacilityId:String? = null) {
+ val outboundMinutes: Int? = null, val returnMinutes: Int? = null, val restFacilityId:String? = null,
+ val courseDriveMinutes:Int? = null, val etaSource:String? = null, val etaOriginLabel:String? = null, val etaCalculatedAt:Long? = null, val etaWasCached:Boolean=false) {
  fun valid() = restMinutes in 0..300 && walkMinutes in 0..120 &&
-  (outboundMinutes == null || outboundMinutes in 0..720) && (returnMinutes == null || returnMinutes in 0..720)
+  (outboundMinutes == null || outboundMinutes in 0..720) && (returnMinutes == null || returnMinutes in 0..720) &&
+  (courseDriveMinutes==null||courseDriveMinutes in 0..720) && (etaSource==null||etaSource=="OSRM") &&
+  (etaOriginLabel==null||etaOriginLabel.length in 1..80) && (etaCalculatedAt==null||etaCalculatedAt>0)
  val transferKnown get() = outboundMinutes != null && returnMinutes != null
 }
 data class FamilyMemory(val id: String, val routeId: String, val carName: String, val rating: Int,
@@ -34,7 +37,7 @@ fun FamilySnapshot.validated(): FamilySnapshot = copy(
 fun rankFamilyRoutes(snapshot: FamilySnapshot): List<FamilyMatch> {
  val s=snapshot.validated(); val p=s.preferences
  return Catalog.routes.map { r ->
-  val plan=s.plans[r.id]?:FamilyPlan(); val total=r.minutes+plan.restMinutes+plan.walkMinutes+(plan.outboundMinutes?:0)+(plan.returnMinutes?:0)
+  val plan=s.plans[r.id]?:FamilyPlan(); val total=(plan.courseDriveMinutes?:r.minutes)+plan.restMinutes+plan.walkMinutes+(plan.outboundMinutes?:0)+(plan.returnMinutes?:0)
   val facility=RestFacilities.find(plan.restFacilityId,r.id)
   val conflicts=buildList { if(total>p.availableMinutes)add("왕복 포함 계획 시간이 여유 시간을 넘어요")
    if(plan.walkMinutes>p.walkMinutes)add("계획한 걷기 시간이 가족 조건을 넘어요") }
@@ -72,3 +75,11 @@ class FamilyEngine(private val repository: FamilyRepository) {
  }
  private fun update(value: FamilySnapshot) { repository.saveFamily(value);snapshot=value }
 }
+
+internal fun withEta(plan:FamilyPlan,value:EtaEstimate):FamilyPlan {
+ require(value.valid())
+ return plan.copy(outboundMinutes=value.outboundMinutes,returnMinutes=value.returnMinutes,courseDriveMinutes=value.courseMinutes,
+  etaSource="OSRM",etaOriginLabel=value.originLabel,etaCalculatedAt=value.calculatedAt,etaWasCached=value.cached)
+}
+internal fun manualTransfers(plan:FamilyPlan,outbound:Int?=plan.outboundMinutes,back:Int?=plan.returnMinutes)=
+ plan.copy(outboundMinutes=outbound,returnMinutes=back,courseDriveMinutes=null,etaSource=null,etaOriginLabel=null,etaCalculatedAt=null,etaWasCached=false)

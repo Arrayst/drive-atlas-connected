@@ -4,6 +4,12 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -55,23 +61,34 @@ private val CardShape = RoundedCornerShape(18.dp)
 }
 
 @Composable internal fun DesignSidebar(page:String,unlocked:Boolean,snapshot:Snapshot,wide:Boolean,compact:Boolean,onPage:(String)->Unit,onDebug:()->Unit) {
+ val sidebarMuted = Color(0xFF626B64)
  Column(Modifier.width(if(wide)136.dp else 116.dp).fillMaxHeight().background(White).border(1.dp,Line).padding(horizontal=12.dp,vertical=28.dp),horizontalAlignment=Alignment.CenterHorizontally) {
   Box(Modifier.size(52.dp).background(AtlasDark,RoundedCornerShape(16.dp)),contentAlignment=Alignment.Center) { AtlasSymbol("roads",Color.White,Modifier.size(34.dp)) }
   Text("DRIVE ATLAS",color=Ink,fontSize=12.sp,fontWeight=FontWeight.ExtraBold,letterSpacing=.8.sp,modifier=Modifier.padding(top=13.dp))
   Spacer(Modifier.height(if(compact)28.dp else 64.dp))
-  listOf(Triple("discover","길 고르기","explore"),Triple("records","다녀온 길","roads"),Triple("atlas","우표 도감","stamp")).forEach { (id,label,icon) ->
-   val active=unlocked&&(page==id||(page in listOf("curation","detail","trip")&&id=="discover"))
-   Column(Modifier.fillMaxWidth().height(104.dp).clip(RoundedCornerShape(16.dp)).background(if(active)AtlasSoft else Color.Transparent).clickable(enabled=unlocked){onPage(id)},horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.Center) {
-    AtlasSymbol(icon,if(active)AtlasGreen else Muted,Modifier.size(30.dp))
-    Text(label,color=if(active)AtlasGreen else Muted,fontSize=17.sp,fontWeight=if(active)FontWeight.Bold else FontWeight.Medium,modifier=Modifier.padding(top=12.dp))
+  listOf(Triple("discover","길 고르기","explore"),Triple("family","가족 비교","roads"),Triple("family-memory","우리 차 기억","stamp")).forEach { (id,label,icon) ->
+   val active=unlocked&&(page==id||(page=="auto-eta"&&id=="family")||(page in listOf("curation","detail","trip")&&id=="discover"))
+   val interaction = remember(id) { MutableInteractionSource() }
+   val focused by interaction.collectIsFocusedAsState()
+   Column(Modifier.fillMaxWidth().height(if(compact)88.dp else 104.dp).clip(RoundedCornerShape(16.dp)).background(if(active)AtlasSoft else Color.Transparent).border(if(focused)3.dp else 0.dp,if(focused)Color(0xFF005FCC) else Color.Transparent,RoundedCornerShape(16.dp)).selectable(selected=active,enabled=unlocked,role=Role.Tab,interactionSource=interaction,indication=androidx.compose.foundation.LocalIndication.current){onPage(id)},horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.Center) {
+    AtlasSymbol(icon,if(active)AtlasGreen else sidebarMuted,Modifier.size(30.dp))
+    Text(label,color=if(active)AtlasGreen else sidebarMuted,fontSize=17.sp,fontWeight=if(active)FontWeight.Bold else FontWeight.Medium,modifier=Modifier.padding(top=12.dp))
    }
    Spacer(Modifier.height(12.dp))
   }
+  HorizontalDivider(color=Line,modifier=Modifier.padding(vertical=8.dp))
+  listOf("records" to "다녀온 길","atlas" to "우표 도감").forEach{(id,label)->
+   val interaction = remember(id) { MutableInteractionSource() }
+   val focused by interaction.collectIsFocusedAsState()
+   TextButton(onClick={onPage(id)},enabled=unlocked,interactionSource=interaction,modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).semantics { selected=unlocked&&page==id }.border(if(focused)3.dp else 0.dp,if(focused)Color(0xFF005FCC) else Color.Transparent,RoundedCornerShape(16.dp))){
+    Text(label,fontSize=14.sp,color=if(page==id)AtlasGreen else sidebarMuted,fontWeight=if(page==id)FontWeight.Bold else FontWeight.Normal)
+   }
+  }
   if(snapshot.trip!=null)TextButton(onClick={onPage("trip")},enabled=unlocked,modifier=Modifier.heightIn(min=64.dp)){Text("여정 계속",fontSize=15.sp,color=AtlasGreen)}
   Spacer(Modifier.weight(1f))
-  Box(Modifier.size(8.dp).background(if(unlocked)AtlasGreen else Muted,CircleShape))
-  Text(if(unlocked)"P · UX 해제 확인" else "차량 상태 확인/제한",fontSize=12.sp,color=Muted,modifier=Modifier.padding(top=10.dp))
-  TextButton(onClick=onDebug,modifier=Modifier.fillMaxWidth().heightIn(min=64.dp),contentPadding=PaddingValues(0.dp)){Text("연결 상태 보기  +",fontSize=11.sp,color=Muted)}
+  Box(Modifier.size(8.dp).background(if(unlocked)AtlasGreen else sidebarMuted,CircleShape))
+  Text(if(unlocked)"P · UX 해제 확인" else "차량 상태 확인/제한",fontSize=12.sp,color=sidebarMuted,modifier=Modifier.padding(top=10.dp))
+  TextButton(onClick=onDebug,modifier=Modifier.fillMaxWidth().heightIn(min=64.dp),contentPadding=PaddingValues(0.dp)){Text("연결 상태 보기  +",fontSize=11.sp,color=sidebarMuted)}
  }
 }
 
