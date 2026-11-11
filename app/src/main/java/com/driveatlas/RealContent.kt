@@ -19,6 +19,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.*
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import java.util.Locale
@@ -44,6 +46,25 @@ internal fun openWeb(context:Context,url:String):Boolean=try{
  if(i.resolveActivity(context.packageManager)==null){if(safePublicUrl(url)){context.startActivity(Intent(context,PublicWebActivity::class.java).putExtra("public_url",url));true}else{Toast.makeText(context,"이 환경에는 링크를 열 앱이 없어요.",Toast.LENGTH_LONG).show();false}}
  else{context.startActivity(i);true}
 }catch(_:ActivityNotFoundException){Toast.makeText(context,"연결할 앱을 찾지 못했어요.",Toast.LENGTH_LONG).show();false}catch(_:SecurityException){Toast.makeText(context,"이 환경에서는 외부 링크가 제한되어 있어요.",Toast.LENGTH_LONG).show();false}
+/** An accepted launch is not evidence of a calculated route or active guidance. */
+internal fun openKakaoRoute(context:Context,route:Route):Boolean{
+ val native=Intent(Intent.ACTION_VIEW,Uri.parse(kakaoAppRouteUrl(route))).setPackage("net.daum.android.map")
+ try{if(native.resolveActivity(context.packageManager)!=null){context.startActivity(native);return true}}
+ catch(_:ActivityNotFoundException){/* Fall back if the app was removed after resolving. */}
+ catch(_:SecurityException){/* Keep the restricted, parked-only web fallback. */}
+ return try{
+  context.startActivity(Intent(context,PublicWebActivity::class.java).putExtra("public_url",directionsUrl(route)))
+  true
+ }catch(_:ActivityNotFoundException){Toast.makeText(context,"지도 화면을 열지 못했어요.",Toast.LENGTH_LONG).show();false}
+ catch(_:SecurityException){Toast.makeText(context,"이 환경에서는 지도 연결이 제한되어 있어요.",Toast.LENGTH_LONG).show();false}
+}
+internal fun kakaoAppRouteUrl(route:Route):String{
+ val stops=route.stops
+ require(stops.size in 2..7)
+ fun coordinate(index:Int)="${stops[index].point.lat},${stops[index].point.lon}"
+ val via=(1 until stops.lastIndex).joinToString(""){index->"&vp${if(index==1) "" else index.toString()}=${coordinate(index)}"}
+ return "kakaomap://route?sp=${coordinate(0)}$via&ep=${coordinate(stops.lastIndex)}&by=car"
+}
 internal fun destinationUrl(route:Route):String{val p=route.stops.last().point;return "https://www.openstreetmap.org/?mlat=${p.lat}&mlon=${p.lon}#map=15/${p.lat}/${p.lon}"}
 internal fun directionsUrl(route:Route):String = "https://map.kakao.com/link/by/car/" + route.stops.joinToString("/"){java.net.URLEncoder.encode(it.name,"UTF-8").replace("+","%20")+",${it.point.lat},${it.point.lon}"}
 internal fun regionFor(route:Route)=when(route.id){"coast"->"강릉";"forest"->"담양";else->"춘천"}
@@ -51,26 +72,73 @@ internal fun regionFor(route:Route)=when(route.id){"coast"->"강릉";"forest"->"
 @Composable internal fun PhotoAttribution(route:Route){val c=LocalContext.current;val p=photoCredit(route);Text(p.caption,fontSize=13.sp,color=Muted);TextButton(onClick={openWeb(c,p.source)},contentPadding=PaddingValues(0.dp)){Text("사진: ${p.author} · ${p.license} ↗",fontSize=12.sp)}}
 @Composable internal fun RealNavigationDialog(route:Route,nativeStatus:String,onNativeSearch:()->Unit,onNativeRoute:()->Unit,onNativeOpen:()->Unit,onNativeLeg:(Int)->Unit,onDismiss:()->Unit,onStart:()->Unit){
  val context=LocalContext.current
+ var advanced by remember(route.id){mutableStateOf(false)}
+ val status=navigationPresentation(nativeStatus)
  Dialog(onDismissRequest=onDismiss,properties=DialogProperties(usePlatformDefaultWidth=false)){
-  Surface(Modifier.widthIn(max=850.dp).padding(24.dp),color=Paper,shape=Corner){Column(Modifier.verticalScroll(rememberScrollState()).padding(32.dp)){
-   Eyebrow("MAP CONNECTION");Text("길을 확인하고, 안전하게 출발해요",fontSize=29.sp,fontWeight=FontWeight.Bold,color=Ink,modifier=Modifier.padding(vertical=16.dp))
-   Text(route.title,fontSize=22.sp,color=Muted);Spacer(Modifier.height(20.dp))
-   NoteBlock("PLEOS 기본 내비",nativeStatus)
-   Spacer(Modifier.height(12.dp));PrimaryButton("기본 내비에서 도착지 검색",onNativeSearch,Modifier.fillMaxWidth())
-   Spacer(Modifier.height(12.dp));SecondaryButton("공개 좌표 코스 전달 · 실험",onNativeRoute,Modifier.fillMaxWidth())
-   Text("코스 시작점과 경유지, 도착점을 기본 내비에 보냅니다. POI ID 없는 좌표 요청은 서비스가 거절할 수 있으며 완료 콜백과 좌표 대조 전에는 성공으로 처리하지 않습니다. 기존 내비 경로가 변경될 수 있어요.",fontSize=14.sp,color=Muted,modifier=Modifier.padding(vertical=10.dp))
-   SecondaryButton("기본 내비 화면 보기",onNativeOpen,Modifier.fillMaxWidth())
-   Spacer(Modifier.height(18.dp));Text("구간별 내비 · 목적지 하나씩",fontSize=22.sp,fontWeight=FontWeight.Bold)
-   Text("전체 경유지 확인이 안 될 때 각 지점을 목적지로 연결합니다. 도착 후 안전하게 주차한 다음 구간을 선택하세요. 자동 구간 전환·전체 코스 완료 인증은 아닙니다. 기존 내비 경로가 바뀝니다.",fontSize=14.sp,color=Muted,modifier=Modifier.padding(vertical=10.dp))
-   route.stops.forEachIndexed{index,stop->
-    SecondaryButton("${index+1}. ${stop.name}까지 안내",{onNativeLeg(index)},Modifier.fillMaxWidth().padding(bottom=8.dp))
+  // Explicit dim: some vehicle window themes supply no useful default scrim.
+  val window=(androidx.compose.ui.platform.LocalView.current.parent as? androidx.compose.ui.window.DialogWindowProvider)?.window
+  DisposableEffect(window){
+   val previous=window?.attributes?.dimAmount
+   window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+   window?.setDimAmount(.64f)
+   onDispose { if(previous!=null) window?.setDimAmount(previous) }
+  }
+  Surface(Modifier.padding(24.dp).widthIn(max=760.dp).fillMaxWidth().heightIn(max=780.dp),color=White,
+   shape=androidx.compose.foundation.shape.RoundedCornerShape(28.dp),shadowElevation=28.dp){
+   Column {
+    Row(Modifier.fillMaxWidth().padding(start=28.dp,end=16.dp,top=18.dp,bottom=18.dp),verticalAlignment=Alignment.CenterVertically){
+     Column(Modifier.weight(1f)){
+      Text("지도 연결",fontSize=28.sp,fontWeight=FontWeight.Bold,color=Ink)
+      Text(route.title,fontSize=16.sp,color=Muted,modifier=Modifier.padding(top=5.dp))
+     }
+     OutlinedButton(onClick=onDismiss,modifier=Modifier.sizeIn(minWidth=76.dp,minHeight=76.dp),shape=androidx.compose.foundation.shape.RoundedCornerShape(14.dp)){
+      Text("닫기 ×",fontSize=17.sp,color=Ink)
+     }
+    }
+    HorizontalDivider(color=Line)
+    Column(Modifier.weight(1f,fill=false).verticalScroll(rememberScrollState()).padding(28.dp),verticalArrangement=Arrangement.spacedBy(18.dp)){
+     Surface(color=if(status.confirmed) androidx.compose.ui.graphics.Color(0xFFEAF5EF) else Paper,shape=androidx.compose.foundation.shape.RoundedCornerShape(18.dp)){
+      Column(Modifier.fillMaxWidth().padding(20.dp)){
+       Text(status.title,fontSize=21.sp,fontWeight=FontWeight.Bold,color=Ink)
+       Text(nativeStatus,fontSize=17.sp,lineHeight=25.sp,color=Muted,modifier=Modifier.padding(top=8.dp)
+        .semantics { liveRegion=androidx.compose.ui.semantics.LiveRegionMode.Polite })
+      }
+     }
+     Column {
+      Text("도착지",fontSize=13.sp,color=Muted)
+      Text(route.stops.last().name,fontSize=22.sp,fontWeight=FontWeight.Bold,color=Ink,modifier=Modifier.padding(top=5.dp))
+      Text("${route.stops.size}개 지점 · 출발 전 내비에서 경로를 확인하세요.",fontSize=14.sp,color=Muted,modifier=Modifier.padding(top=7.dp))
+     }
+     SecondaryButton(if(status.confirmed) "다른 도착지 검색" else "기본 내비 화면 보기",if(status.confirmed) onNativeSearch else onNativeOpen,Modifier.fillMaxWidth())
+     OutlinedButton(onClick={advanced=!advanced},modifier=Modifier.fillMaxWidth().heightIn(min=76.dp),shape=androidx.compose.foundation.shape.RoundedCornerShape(14.dp)){
+      Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){
+       Text("다른 연결 방법 · 실험 기능",color=Muted,fontSize=16.sp)
+       Text(if(advanced) "접기 −" else "펼치기 +",color=Ink,fontSize=16.sp)
+      }
+     }
+     if(advanced){
+      Text("공개 좌표로 코스 전달",fontSize=20.sp,fontWeight=FontWeight.Bold,color=Ink)
+      Text("시작점·경유지·도착점을 기본 내비에 보냅니다. 기존 내비 경로가 바뀔 수 있어요. POI ID 없는 요청은 거절될 수 있으며, 완료 콜백과 좌표 대조 전에는 성공이 아닙니다.",fontSize=15.sp,lineHeight=23.sp,color=Muted)
+      SecondaryButton("전체 코스 전달 · 실험",onNativeRoute,Modifier.fillMaxWidth())
+      HorizontalDivider(color=Line)
+      Text("구간별 안내",fontSize=20.sp,fontWeight=FontWeight.Bold,color=Ink)
+      Text("주차 후 목적지 하나씩 선택하세요. 기존 내비 경로가 바뀝니다. 자동 구간 전환이나 전체 코스 완료 인증은 아닙니다.",fontSize=15.sp,lineHeight=23.sp,color=Muted)
+      route.stops.forEachIndexed{index,stop->SecondaryButton("${index+1}. ${stop.name}",{onNativeLeg(index)},Modifier.fillMaxWidth())}
+      HorizontalDivider(color=Line)
+      Text("외부 지도 · 모의 체험",fontSize=20.sp,fontWeight=FontWeight.Bold,color=Ink)
+      SecondaryButton("카카오맵에서 코스 열기 ↗",{openKakaoRoute(context,route)},Modifier.fillMaxWidth())
+      Text("카카오맵 앱이 있으면 앱으로, 없으면 웹 지도로 연결합니다. 공개 코스 지점만 전달하며 개인 출발지·현재 위치는 보내지 않습니다. 외부 경로는 달라질 수 있고 차량 내비·우표 여정은 시작하지 않습니다.",fontSize=15.sp,lineHeight=23.sp,color=Muted)
+      SecondaryButton("OSM에서 도착지 보기 ↗",{openWeb(context,destinationUrl(route))},Modifier.fillMaxWidth())
+      SecondaryButton("우표 수집 흐름 체험 · SIM",onStart,Modifier.fillMaxWidth())
+     }
+    }
+    HorizontalDivider(color=Line)
+    Column(Modifier.padding(horizontal=28.dp,vertical=20.dp)){
+     PrimaryButton(if(status.confirmed) "내비에서 확인하기" else "기본 내비에서 도착지 검색",if(status.confirmed) onNativeOpen else onNativeSearch,Modifier.fillMaxWidth())
+     Text("주차 중에만 조작 · 검색 요청은 안내 시작이 아닙니다.",fontSize=16.sp,color=Muted,modifier=Modifier.padding(top=10.dp))
+    }
    }
-   Spacer(Modifier.height(22.dp));PrimaryButton("카카오맵에서 코스 열기  ↗",{openWeb(context,directionsUrl(route))},Modifier.fillMaxWidth())
-   Text("앱 안 웹 보기에서는 ‘설치없이 지도보기’를 선택하세요. 외부 지도에서 재탐색하므로 화면의 코스와 달라질 수 있습니다. 차량 내비나 우표 여정은 시작하지 않습니다.",fontSize=14.sp,color=Muted,modifier=Modifier.padding(top=10.dp,bottom=20.dp))
-   SecondaryButton("OSM에서 도착지 보기  ↗",{openWeb(context,destinationUrl(route))},Modifier.fillMaxWidth())
-   Spacer(Modifier.height(12.dp));SecondaryButton("우표 수집 흐름 체험 · SIM",onStart,Modifier.fillMaxWidth())
-   TextButton(onClick=onDismiss,modifier=Modifier.align(Alignment.End).heightIn(min=56.dp)){Text("닫기",fontSize=18.sp)}
-  }}
+  }
  }
 }
 @Composable internal fun SourcesDialog(route:Route,onDismiss:()->Unit){
