@@ -29,15 +29,16 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.util.Locale
 
 // UI only. Safety, vehicle SDK, route geometry, storage and journey evaluation are unchanged.
-internal val AtlasGreen = Color(0xFF9C452D)
-internal val AtlasSoft = Color(0xFFE9E9E5)
-internal val AtlasDark = Color(0xFF292B2A)
-private val CardShape = RoundedCornerShape(4.dp)
+internal val AtlasGreen = Color(0xFF1769F5)
+internal val AtlasSoft = Color(0xFFEAF1FF)
+internal val AtlasDark = Color(0xFF101C30)
+private val CardShape = RoundedCornerShape(20.dp)
 
 @Composable internal fun AtlasSymbol(name: String, color: Color, modifier: Modifier = Modifier) {
  Canvas(modifier) {
@@ -57,27 +58,35 @@ private val CardShape = RoundedCornerShape(4.dp)
    "arrow" -> { drawLine(color,p(.18f,.5f),p(.82f,.5f),s*.065f,StrokeCap.Round);drawLine(color,p(.57f,.25f),p(.82f,.5f),s*.065f,StrokeCap.Round);drawLine(color,p(.57f,.75f),p(.82f,.5f),s*.065f,StrokeCap.Round) }
    "pin" -> {drawCircle(color,s*.22f,p(.5f,.35f),style=st);drawCircle(color,s*.055f,p(.5f,.35f));drawLine(color,p(.32f,.52f),p(.5f,.82f),s*.06f,StrokeCap.Round);drawLine(color,p(.68f,.52f),p(.5f,.82f),s*.06f,StrokeCap.Round)}
    "clock" -> {drawCircle(color,s*.35f,style=st);drawLine(color,p(.5f,.28f),p(.5f,.51f),s*.06f,StrokeCap.Round);drawLine(color,p(.5f,.51f),p(.65f,.59f),s*.06f,StrokeCap.Round)}
+   "check" -> {drawLine(color,p(.24f,.50f),p(.43f,.68f),s*.09f,StrokeCap.Round);drawLine(color,p(.43f,.68f),p(.77f,.31f),s*.09f,StrokeCap.Round)}
    else -> {drawLine(color,p(.2f,.3f),p(.8f,.3f),s*.06f,StrokeCap.Round);drawLine(color,p(.2f,.7f),p(.8f,.7f),s*.06f,StrokeCap.Round);drawCircle(color,s*.09f,p(.4f,.3f));drawCircle(color,s*.09f,p(.65f,.7f))}
   }
  }
 }
 
 @Composable internal fun DesignSidebar(page:String,unlocked:Boolean,snapshot:Snapshot,wide:Boolean,compact:Boolean,onPage:(String)->Unit,onDebug:()->Unit) {
- Row(Modifier.fillMaxWidth().height(88.dp).background(AtlasDark).padding(horizontal=28.dp,vertical=10.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-  Text("Drive Atlas",color=Color.White,fontSize=23.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(end=28.dp))
-  Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-  listOf("discover" to "길 고르기","family" to "가족 비교","auto-eta" to "왕복 시간","family-memory" to "우리 차 기억","records" to "다녀온 길","atlas" to "우표 도감").forEach { (id,label) ->
-   val active=unlocked&&(page==id||(page in listOf("curation","detail","trip")&&id=="discover"))
-   val interaction=remember(id){MutableInteractionSource()}
-   val focused by interaction.collectIsFocusedAsState()
-   Column(Modifier.height(64.dp).width(116.dp).background(if(active)Color.White.copy(alpha=.10f) else Color.Transparent).border(if(focused)3.dp else 0.dp,if(focused)Color.White else Color.Transparent).selectable(selected=active,enabled=unlocked,role=Role.Tab,interactionSource=interaction,indication=androidx.compose.foundation.LocalIndication.current){onPage(id)},horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.Center) {
-    Text(label,color=if(unlocked)Color.White else Color(0xFFB7BAB8),fontSize=17.sp,fontWeight=if(active)FontWeight.Bold else FontWeight.Normal,modifier=Modifier.padding(horizontal=12.dp,vertical=16.dp))
-    Box(Modifier.fillMaxWidth().height(3.dp).background(if(active)Color(0xFFE9A589) else Color.Transparent))
+ Row(Modifier.fillMaxWidth().height(104.dp).background(White).padding(horizontal=if(wide)36.dp else 24.dp,vertical=14.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(16.dp)) {
+  Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)) {
+   Box(Modifier.size(40.dp).background(AtlasGreen,RoundedCornerShape(13.dp)),contentAlignment=Alignment.Center){AtlasSymbol("roads",White,Modifier.size(28.dp))}
+   if(wide)Text("Drive Atlas",color=Ink,fontSize=23.sp,fontWeight=FontWeight.Bold)
+  }
+  Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+   listOf("discover" to "길 고르기","family" to "가족 비교","auto-eta" to "왕복 시간","family-memory" to "우리 차 기억","records" to "다녀온 길","atlas" to "우표 도감").forEach { (id,label) ->
+    val active=unlocked&&(page==id||(page in listOf("curation","detail","trip")&&id=="discover"))
+    val interaction=remember(id){MutableInteractionSource()}
+    val focused by interaction.collectIsFocusedAsState()
+    Box(Modifier.height(76.dp).width(140.dp).clip(RoundedCornerShape(18.dp)).background(if(active)AtlasSoft else Color.Transparent).border(if(focused)3.dp else 0.dp,if(focused)AtlasGreen else Color.Transparent,RoundedCornerShape(18.dp)).selectable(selected=active,enabled=unlocked,role=Role.Tab,interactionSource=interaction,indication=androidx.compose.foundation.LocalIndication.current){onPage(id)}.padding(horizontal=12.dp),contentAlignment=Alignment.Center) {
+     Text(label,color=if(!unlocked)Muted else if(active)AtlasGreen else Ink,fontSize=20.sp,fontWeight=if(active)FontWeight.Bold else FontWeight.Medium,maxLines=1,textAlign=TextAlign.Center)
+    }
    }
   }
+  if(snapshot.trip!=null)TextButton(onClick={onPage("trip")},enabled=unlocked,modifier=Modifier.heightIn(min=76.dp)){Text("여정 계속",color=if(unlocked)AtlasGreen else Muted,fontSize=18.sp)}
+  TextButton(onClick=onDebug,modifier=Modifier.heightIn(min=76.dp)) {
+   Column(horizontalAlignment=Alignment.End,verticalArrangement=Arrangement.spacedBy(6.dp)) {
+    Text(if(unlocked)"P · UX 해제 확인" else "차량 상태 확인/제한",fontSize=14.sp,color=Muted)
+    Text("연결 상태 보기",fontSize=16.sp,color=Ink)
+   }
   }
-  if(snapshot.trip!=null)TextButton(onClick={onPage("trip")},enabled=unlocked,modifier=Modifier.heightIn(min=56.dp)){Text("여정 계속",color=Color.White)}
-  TextButton(onClick=onDebug,modifier=Modifier.heightIn(min=64.dp)) {Column(horizontalAlignment=Alignment.End){Text(if(unlocked)"P · UX 해제 확인" else "차량 상태 확인/제한",fontSize=13.sp,color=Color(0xFFD8DAD8));Text("연결 상태 보기",fontSize=14.sp,color=Color.White,modifier=Modifier.padding(top=5.dp))}}
  }
 }
 
@@ -114,46 +123,96 @@ private val CardShape = RoundedCornerShape(4.dp)
 
 @Composable internal fun DesignHome(snapshot:Snapshot,onCategory:(String)->Unit,onTrip:()->Unit,onAtlas:()->Unit,onRoute:(Route)->Unit,filters:GuideFilters) {
  var selectedId by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(Catalog.routes.first().id) }
- val selected=Catalog.routes.first{it.id==selectedId}
- Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.Bottom,horizontalArrangement=Arrangement.SpaceBetween) {
-  Column {Text("오늘의 길을 고르세요",color=Ink,fontSize=34.sp,fontWeight=FontWeight.Bold);Text("장소를 고르고, 도로와 정차 계획을 확인하세요.",color=Muted,fontSize=18.sp,modifier=Modifier.padding(top=8.dp))}
-  Text("${Catalog.routes.size}개 코스",color=Muted,fontSize=17.sp)
+ val selected=Catalog.routes.firstOrNull{it.id==selectedId}?:Catalog.routes.first()
+ Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween) {
+  Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
+   Text("어디로 떠나볼까요?",color=Ink,fontSize=36.sp,fontWeight=FontWeight.Bold,letterSpacing=(-1).sp)
+   Text("마음에 드는 길부터 골라보세요.",color=Muted,fontSize=20.sp)
+  }
+  Text("${Catalog.routes.size}개의 드라이브 코스",color=Muted,fontSize=18.sp)
  }
- Spacer(Modifier.height(26.dp))
- Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(28.dp)) {
-  Column(Modifier.weight(.38f)) {
-   Catalog.routes.forEach { route ->
-    val active=route.id==selectedId
-    val interaction=remember(route.id){MutableInteractionSource()};val focused by interaction.collectIsFocusedAsState()
-    Row(Modifier.fillMaxWidth().height(156.dp).background(if(active)White else Color.Transparent).border(if(focused)3.dp else 1.dp,if(focused)AtlasGreen else if(active)Ink else Line).selectable(selected=active,role=Role.RadioButton,interactionSource=interaction,indication=androidx.compose.foundation.LocalIndication.current){selectedId=route.id},verticalAlignment=Alignment.CenterVertically) {
-     Box(Modifier.width(5.dp).fillMaxHeight().background(if(active)AtlasGreen else Color.Transparent))
-     RoutePhoto(route,Modifier.width(138.dp).fillMaxHeight())
-     Column(Modifier.weight(1f).padding(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-      Text(when(route.id){"coast"->"강릉 / 바다";"forest"->"담양 / 숲과 산책";else->"춘천 / 호수"},color=Muted,fontSize=15.sp)
-      Text(route.title,color=Ink,fontSize=24.sp,fontWeight=FontWeight.Bold)
-      InlineStats(route)
-     }
+ Spacer(Modifier.height(28.dp))
+ BoxWithConstraints(Modifier.fillMaxWidth()) {
+  if(maxWidth>=1000.dp) {
+   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(24.dp)) {
+    Column(Modifier.weight(.38f),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+     Catalog.routes.forEach { route -> HomeRouteChoice(route,route.id==selected.id){selectedId=route.id} }
+     HomeCategories(onCategory)
     }
-    Spacer(Modifier.height(12.dp))
+    HomeRouteConsole(selected,Modifier.weight(.62f)){onRoute(selected)}
    }
-   Text("OSRM 추정 · 정차·교통 제외",color=Muted,fontSize=14.sp,modifier=Modifier.padding(top=2.dp,bottom=18.dp))
-   HorizontalDivider(color=Line)
-   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){listOf("recommended" to "추천길","season" to "계절별","theme" to "테마별").forEach{(id,label)->TextButton(onClick={onCategory(id)},modifier=Modifier.heightIn(min=64.dp)){Text(label,color=Ink,fontSize=17.sp)}}}
-   Text("사진 출처는 선택한 코스의 이용 안내에서 확인할 수 있어요.",color=Muted,fontSize=13.sp)
-  }
-  Column(Modifier.weight(.62f)) {
-   key(selected.id) {RealRoadMap(selected,Modifier.fillMaxWidth().height(470.dp))}
-   Row(Modifier.fillMaxWidth().background(White).padding(22.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(20.dp)) {
-    Column(Modifier.weight(1f)){Text(selected.title,color=Ink,fontSize=28.sp,fontWeight=FontWeight.Bold);Text(selected.stops.first().name+" → "+selected.stops.last().name,color=Muted,fontSize=16.sp,modifier=Modifier.padding(top=10.dp))}
-    PrimaryButton("코스 살펴보기",{onRoute(selected)})
+  } else {
+   Column(verticalArrangement=Arrangement.spacedBy(20.dp)) {
+    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+     Catalog.routes.forEach { route -> Box(Modifier.width(360.dp)){HomeRouteChoice(route,route.id==selected.id){selectedId=route.id}} }
+    }
+    HomeRouteConsole(selected,Modifier.fillMaxWidth()){onRoute(selected)}
+    HomeCategories(onCategory)
    }
-   PhotoCreditLine(selected)
   }
  }
- Spacer(Modifier.height(20.dp));HorizontalDivider(color=Line)
- Row(Modifier.fillMaxWidth().padding(vertical=10.dp),verticalAlignment=Alignment.CenterVertically) {
-  Text(if(snapshot.trip!=null)"저장한 모의 여정을 이어갈 수 있어요." else "선택은 주차 중에, 풍경은 안전하게",color=Muted,fontSize=17.sp,modifier=Modifier.weight(1f))
-  TextButton(onClick=if(snapshot.trip!=null)onTrip else onAtlas,modifier=Modifier.heightIn(min=56.dp)){Text(if(snapshot.trip!=null)"여정 이어보기" else "우표 도감",color=Ink,fontSize=17.sp)}
+ Spacer(Modifier.height(24.dp))
+ Row(Modifier.fillMaxWidth().background(White,CardShape).padding(horizontal=24.dp,vertical=8.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(20.dp)) {
+  AtlasSymbol(if(snapshot.trip!=null)"roads" else "stamp",AtlasGreen,Modifier.size(28.dp))
+  Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(5.dp)) {
+   Text(if(snapshot.trip!=null)"저장한 여정이 있어요" else "다녀온 길을 모아보세요",color=Ink,fontSize=20.sp,fontWeight=FontWeight.SemiBold)
+   Text(if(snapshot.trip!=null)"이어서 살펴볼 수 있는 모의 여정" else "선택은 주차 중에, 풍경은 안전하게",color=Muted,fontSize=16.sp)
+  }
+  TextButton(onClick=if(snapshot.trip!=null)onTrip else onAtlas,modifier=Modifier.heightIn(min=76.dp)){Text(if(snapshot.trip!=null)"여정 이어보기" else "우표 도감",color=AtlasGreen,fontSize=20.sp)}
+ }
+}
+
+@Composable private fun HomeRouteChoice(route:Route,active:Boolean,onSelect:()->Unit) {
+ val interaction=remember(route.id){MutableInteractionSource()}
+ val focused by interaction.collectIsFocusedAsState()
+ Row(Modifier.fillMaxWidth().height(152.dp).clip(CardShape).background(if(active)AtlasSoft else White).border(if(active||focused)2.dp else 0.dp,if(active||focused)AtlasGreen else Color.Transparent,CardShape).selectable(selected=active,role=Role.RadioButton,interactionSource=interaction,indication=androidx.compose.foundation.LocalIndication.current,onClick=onSelect).padding(16.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(18.dp)) {
+  RoutePhoto(route,Modifier.size(96.dp).clip(RoundedCornerShape(14.dp)))
+  Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+   Text(when(route.id){"coast"->"강릉 · 바다";"forest"->"담양 · 숲과 산책";else->"춘천 · 호수"},color=if(active)AtlasGreen else Muted,fontSize=17.sp,fontWeight=FontWeight.Medium)
+   Text(route.title,color=Ink,fontSize=24.sp,fontWeight=FontWeight.Bold,maxLines=2,overflow=TextOverflow.Ellipsis)
+   Text(if(active)"지도에서 보고 있는 길" else "눌러서 지도 보기",color=if(active)AtlasGreen else Muted,fontSize=16.sp)
+  }
+  Box(Modifier.size(26.dp),contentAlignment=Alignment.Center){if(active)Box(Modifier.fillMaxSize().background(AtlasGreen,CircleShape),contentAlignment=Alignment.Center){AtlasSymbol("check",White,Modifier.size(20.dp))}}
+ }
+}
+
+@Composable private fun HomeRouteConsole(route:Route,modifier:Modifier,onOpen:()->Unit) {
+ val context=LocalContext.current
+ val road=remember(route.id){readRoad(context,route.id)}
+ Column(modifier.clip(CardShape).background(White)) {
+  key(route.id){RealRoadMap(route,Modifier.fillMaxWidth().height(360.dp))}
+  Column(Modifier.padding(24.dp)) {
+   Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(24.dp)) {
+    Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+     Text(route.title,color=Ink,fontSize=28.sp,fontWeight=FontWeight.Bold)
+     Text(route.stops.first().name+" → "+route.stops.last().name,color=Muted,fontSize=18.sp,maxLines=2)
+    }
+    Column(horizontalAlignment=Alignment.End,verticalArrangement=Arrangement.spacedBy(4.dp)) {
+     Text(String.format(Locale.KOREA,"약 %.0f분",road.seconds/60),color=Ink,fontSize=38.sp,fontWeight=FontWeight.Bold,letterSpacing=(-1).sp)
+     Text(String.format(Locale.KOREA,"코스 주행 · %.1f km",road.meters/1000),color=Muted,fontSize=17.sp)
+    }
+   }
+   Text("OSRM 도로 추정 · 왕복·정차·실시간 교통 제외",color=Muted,fontSize=15.sp,modifier=Modifier.padding(top=14.dp,bottom=20.dp))
+   Button(onClick=onOpen,shape=RoundedCornerShape(16.dp),colors=ButtonDefaults.buttonColors(containerColor=AtlasGreen,contentColor=White),modifier=Modifier.fillMaxWidth().heightIn(min=76.dp)) {
+    Box(Modifier.fillMaxWidth(),contentAlignment=Alignment.Center) {
+     Text("이 코스 살펴보기",fontSize=22.sp,fontWeight=FontWeight.Bold,textAlign=TextAlign.Center,modifier=Modifier.fillMaxWidth().padding(horizontal=40.dp))
+     AtlasSymbol("arrow",White,Modifier.align(Alignment.CenterEnd).size(24.dp))
+    }
+   }
+   PhotoCreditLine(route)
+  }
+ }
+}
+
+@Composable private fun HomeCategories(onCategory:(String)->Unit) {
+ Column(Modifier.fillMaxWidth().padding(top=12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+  Text("다른 기준으로 찾기",color=Muted,fontSize=17.sp,modifier=Modifier.padding(start=4.dp))
+  Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+   listOf("recommended" to "추천길","season" to "계절별","theme" to "테마별").forEach{(id,label)->
+    TextButton(onClick={onCategory(id)},shape=RoundedCornerShape(16.dp),colors=ButtonDefaults.textButtonColors(containerColor=White,contentColor=Ink),modifier=Modifier.weight(1f).heightIn(min=76.dp)){Text(label,fontSize=20.sp,fontWeight=FontWeight.Medium)}
+   }
+  }
+  Text("사진 출처는 각 코스의 출처·이용 안내에서 확인하세요.",color=Muted,fontSize=13.sp,modifier=Modifier.padding(start=4.dp,top=2.dp))
  }
 }
 

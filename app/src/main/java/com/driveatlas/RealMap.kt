@@ -78,9 +78,9 @@ private suspend fun loadVisibleTiles(context:Context,v:MapViewport):List<MapTile
   }
   Surface(Modifier.align(Alignment.TopStart).padding(12.dp),color=White.copy(alpha=.96f),shape=Corner){Column(Modifier.padding(12.dp)){Text("실제 지도 · 도로 경로",fontSize=16.sp,color=Ink);Text("OSRM 스냅샷 · 실시간 안내 아님",fontSize=12.sp,color=Muted)}}
   Column(Modifier.align(Alignment.TopEnd).padding(12.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){
-   FilledTonalButton(onClick={zoom=(zoom+1).coerceAtMost(2)},enabled=zoom<2,contentPadding=PaddingValues(0.dp),modifier=Modifier.size(56.dp)){Text("+",fontSize=27.sp)}
-   FilledTonalButton(onClick={zoom=(zoom-1).coerceAtLeast(-2)},enabled=zoom> -2,contentPadding=PaddingValues(0.dp),modifier=Modifier.size(56.dp)){Text("−",fontSize=27.sp)}
-   FilledTonalButton(onClick={zoom=0},modifier=Modifier.heightIn(min=48.dp)){Text("전체")}
+   FilledTonalButton(onClick={zoom=(zoom+1).coerceAtMost(2)},enabled=zoom<2,contentPadding=PaddingValues(0.dp),modifier=Modifier.size(76.dp)){Text("+",fontSize=27.sp)}
+   FilledTonalButton(onClick={zoom=(zoom-1).coerceAtLeast(-2)},enabled=zoom> -2,contentPadding=PaddingValues(0.dp),modifier=Modifier.size(76.dp)){Text("−",fontSize=27.sp)}
+   FilledTonalButton(onClick={zoom=0},contentPadding=PaddingValues(0.dp),modifier=Modifier.size(76.dp)){Text("전체",fontSize=18.sp)}
   }
   if(tiles==null)Surface(Modifier.align(Alignment.Center),color=White,shape=Corner){Text("실제 지도를 불러오는 중…",Modifier.padding(20.dp),color=Ink)}
   else if(tiles.orEmpty().none{it.image!=null})Surface(Modifier.align(Alignment.Center).padding(70.dp),color=White,shape=Corner){Column(Modifier.padding(24.dp)){Text(if(failedMode)"오프라인 상황 체험" else "지도를 불러오지 못했어요",fontSize=20.sp,color=Ink);Text("인터넷 연결이 필요해요. 경로를 빈 지도 위에 그리지 않습니다.",fontSize=15.sp,color=Muted);TextButton(onClick={failedMode=false;refresh++}){Text("다시 불러오기")}}}

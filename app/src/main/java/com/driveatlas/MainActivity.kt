@@ -50,14 +50,14 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-internal val Ink = Color(0xFF292B2A)
-internal val Paper = Color(0xFFF2F2EF)
+internal val Ink = Color(0xFF101C30)
+internal val Paper = Color(0xFFF2F5FA)
 internal val White = Color(0xFFFFFFFF)
-internal val Muted = Color(0xFF686761)
-internal val Line = Color(0xFFD8D5CC)
-internal val Sage = Color(0xFFE9E9E5)
+internal val Muted = Color(0xFF647187)
+internal val Line = Color(0xFFDFE6EF)
+internal val Sage = Color(0xFFE8F0FE)
 internal val Amber = Color(0xFFBBDEB5)
-internal val Coral = Color(0xFF9C452D)
+internal val Coral = Color(0xFF1769F5)
 internal val Mono = FontFamily.Monospace
 internal val Corner = RoundedCornerShape(12.dp)
 
@@ -575,14 +575,14 @@ class MainActivity : ComponentActivity() {
 @Composable internal fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
-    Button(onClick = onClick, enabled = enabled, interactionSource = interaction, border = if(focused) BorderStroke(3.dp, Color(0xFF55DDB4)) else null, modifier = modifier.heightIn(min = 57.dp), shape = RoundedCornerShape(7.dp), contentPadding = PaddingValues(horizontal = 20.dp, vertical = 13.dp), colors = ButtonDefaults.buttonColors(containerColor = Ink, contentColor = White, disabledContainerColor = Sage, disabledContentColor = Muted)) {
-        Text(text, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+    Button(onClick = onClick, enabled = enabled, interactionSource = interaction, border = if(focused) BorderStroke(4.dp, Ink) else null, modifier = modifier.heightIn(min = 76.dp), shape = RoundedCornerShape(16.dp), contentPadding = PaddingValues(horizontal = 20.dp, vertical = 13.dp), colors = ButtonDefaults.buttonColors(containerColor = Coral, contentColor = White, disabledContainerColor = Sage, disabledContentColor = Muted)) {
+        Text(text, fontSize = 20.sp, fontWeight = FontWeight.Bold)
     }
 }
 @Composable internal fun SecondaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
-    OutlinedButton(onClick = onClick, interactionSource = interaction, modifier = modifier.heightIn(min = 56.dp), shape = RoundedCornerShape(7.dp), border = BorderStroke(if(focused) 3.dp else 1.dp, if(focused) Color(0xFF005FCC) else Line), contentPadding = PaddingValues(horizontal = 17.dp, vertical = 13.dp)) { Text(text, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Ink) }
+    OutlinedButton(onClick = onClick, interactionSource = interaction, modifier = modifier.heightIn(min = 76.dp), shape = RoundedCornerShape(16.dp), border = BorderStroke(if(focused) 3.dp else 1.dp, if(focused) Color(0xFF005FCC) else Line), contentPadding = PaddingValues(horizontal = 17.dp, vertical = 13.dp)) { Text(text, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Ink) }
 }
 @Composable internal fun PixelIcon(name: String, color: Color, modifier: Modifier = Modifier) {
     val rows = when (name) {

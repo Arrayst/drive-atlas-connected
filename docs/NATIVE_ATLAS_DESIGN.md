@@ -1,3 +1,5 @@
+> Historical workbench iteration. The current trip-console layout and validation scope are documented in [TRIP_CONSOLE_DESIGN.md](TRIP_CONSOLE_DESIGN.md).
+
 # Native atlas workbench
 
 ## Intent
