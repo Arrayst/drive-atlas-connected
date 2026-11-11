@@ -255,6 +255,10 @@ internal class PleosConnections(private val context: Context, private val vehicl
             } else nav("열 수 있는 기본 내비 앱을 찾지 못함")
         } catch (error: Exception) { nav("내비 앱 열기 실패: ${error.javaClass.simpleName}") }
     }
+    fun invalidatePlannedRoute() {
+        requestToken++; pendingRoute=null; routeConfirmed=false; routeStarted=false; routeVerification=null
+        nav("현재 선택한 여정의 내비 전달·좌표 대조는 아직 확인하지 않았어요. 기존 내비 경로는 자동으로 바꾸지 않습니다.")
+    }
     fun requestNativeLeg(route: Route, index: Int) {
         val stop=route.stops.getOrNull(index) ?: return
         requestNativeRoute(route.copy(id=route.id+"-leg-"+index,title=route.title+" · "+(index+1)+"구간",stops=listOf(stop)))
@@ -262,8 +266,8 @@ internal class PleosConnections(private val context: Context, private val vehicl
     fun requestNativeRoute(route: Route) {
         if (pendingRoute != null) { nav("이전 코스 요청 응답 대기 중 · 중복 요청하지 않음"); return }
         if (state.safety != Safety.PARKED || !naviReady) { nav("주차 확인 및 내비 연결이 필요합니다"); return }
-        if (route.stops.size !in 1..3 || route.stops.any { !validNativePoint(it.point) }) {
-            nav("유효한 목적지와 최대 경유지 2곳이 필요합니다 · 요청하지 않음"); return
+        if (!RestItinerary.nativeFullRouteSupported(route)) {
+            nav("내비 전체 요청은 목적지 포함 최대 3곳입니다 · 지점을 생략하지 않습니다. 주차 후 구간별 요청을 사용하세요."); return
         }
         val token = ++requestToken
         pendingRoute = route; routeConfirmed = false; routeStarted = false

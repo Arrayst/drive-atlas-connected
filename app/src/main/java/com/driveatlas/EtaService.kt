@@ -51,17 +51,27 @@ private fun java.io.InputStream.readBytesLimited(max:Int):ByteArray {
  return out.toByteArray()
 }
 internal class EtaCache(context:Context) {
- private val prefs=context.getSharedPreferences("atlas_public_eta_v1",Context.MODE_PRIVATE)
+ // v1 had no itinerary binding. Do not migrate those results as current estimates.
+ private val prefs=context.getSharedPreferences("atlas_public_eta_v2",Context.MODE_PRIVATE)
  fun save(request:EtaRequest,value:EtaEstimate){
   val key=publicEtaCacheKey(request)?:return
-  if(!request.valid()||!value.valid()||value.routeId!=request.routeId)return
+  if(!request.valid()||!value.valid()||value.routeId!=request.routeId||value.itineraryKey!=request.itineraryKey()||value.selectedRestIds!=request.selectedRestIds||value.originLabel!=request.originLabel)return
   val j=JSONObject().put("route",value.routeId).put("origin",value.originLabel).put("out",value.outboundSeconds).put("course",value.courseSeconds).put("back",value.returnSeconds).put("meters",value.meters).put("at",value.calculatedAt)
+   .put("itinerary",value.itineraryKey).put("legs",org.json.JSONArray(value.legSeconds)).put("breaks",org.json.JSONArray(value.restBreakAfterLegs))
+   .put("rests",org.json.JSONArray(value.selectedRestIds)).put("slots",JSONObject(value.restAfterStopIndex))
   check(prefs.edit().putString(key,j.toString()).commit())
  }
  fun load(publicId:String?,routeId:String,now:Long):EtaEstimate? {
-  if(publicId==null||DepartureReferences.all.none{it.id==publicId}||Catalog.routes.none{it.id==routeId})return null
-  return runCatching{val raw=prefs.getString(publicId+":"+routeId,null)?:return null;val j=JSONObject(raw)
-   EtaEstimate(j.getString("route"),j.getString("origin"),j.getDouble("out"),j.getDouble("course"),j.getDouble("back"),j.getDouble("meters"),j.getLong("at"),true)
-  }.getOrNull()?.takeIf{it.routeId==routeId&&freshCachedEta(it,now)}
+  val ref=DepartureReferences.all.firstOrNull{it.id==publicId}?:return null
+  return load(EtaRequest(routeId,ref.point,ref.label,ref.id),now)
+ }
+ fun load(request:EtaRequest,now:Long):EtaEstimate? {
+  val key=publicEtaCacheKey(request)?:return null
+  return runCatching{val raw=prefs.getString(key,null)?:return null;val j=JSONObject(raw)
+   val legs=j.getJSONArray("legs");val breaks=j.getJSONArray("breaks");val rests=j.getJSONArray("rests");val slots=j.getJSONObject("slots")
+   EtaEstimate(j.getString("route"),j.getString("origin"),j.getDouble("out"),j.getDouble("course"),j.getDouble("back"),j.getDouble("meters"),j.getLong("at"),true,
+    j.getString("itinerary"),(0 until legs.length()).map{legs.getDouble(it)},(0 until breaks.length()).map{breaks.getInt(it)},
+    (0 until rests.length()).map{rests.getString(it)},slots.keys().asSequence().associateWith{slots.getInt(it)})
+  }.getOrNull()?.takeIf{it.routeId==request.routeId&&it.originLabel==request.originLabel&&it.itineraryKey==request.itineraryKey()&&it.selectedRestIds==request.selectedRestIds&&freshCachedEta(it,now)}
  }
 }

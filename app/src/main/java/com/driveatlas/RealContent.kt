@@ -48,6 +48,9 @@ internal fun openWeb(context:Context,url:String):Boolean=try{
 }catch(_:ActivityNotFoundException){Toast.makeText(context,"연결할 앱을 찾지 못했어요.",Toast.LENGTH_LONG).show();false}catch(_:SecurityException){Toast.makeText(context,"이 환경에서는 외부 링크가 제한되어 있어요.",Toast.LENGTH_LONG).show();false}
 /** An accepted launch is not evidence of a calculated route or active guidance. */
 internal fun openKakaoRoute(context:Context,route:Route):Boolean{
+ if(route.stops.size !in 2..7||route.stops.any{!validNativePoint(it.point)}){
+  Toast.makeText(context,"지도 경로는 출발·도착 포함 2~7곳까지예요. 지점을 생략하지 않습니다.",Toast.LENGTH_LONG).show();return false
+ }
  val native=Intent(Intent.ACTION_VIEW,Uri.parse(kakaoAppRouteUrl(route))).setPackage("net.daum.android.map")
  try{if(native.resolveActivity(context.packageManager)!=null){context.startActivity(native);return true}}
  catch(_:ActivityNotFoundException){/* Fall back if the app was removed after resolving. */}
@@ -60,13 +63,16 @@ internal fun openKakaoRoute(context:Context,route:Route):Boolean{
 }
 internal fun kakaoAppRouteUrl(route:Route):String{
  val stops=route.stops
- require(stops.size in 2..7)
+ require(stops.size in 2..7&&stops.all{validNativePoint(it.point)})
  fun coordinate(index:Int)="${stops[index].point.lat},${stops[index].point.lon}"
  val via=(1 until stops.lastIndex).joinToString(""){index->"&vp${if(index==1) "" else index.toString()}=${coordinate(index)}"}
  return "kakaomap://route?sp=${coordinate(0)}$via&ep=${coordinate(stops.lastIndex)}&by=car"
 }
 internal fun destinationUrl(route:Route):String{val p=route.stops.last().point;return "https://www.openstreetmap.org/?mlat=${p.lat}&mlon=${p.lon}#map=15/${p.lat}/${p.lon}"}
-internal fun directionsUrl(route:Route):String = "https://map.kakao.com/link/by/car/" + route.stops.joinToString("/"){java.net.URLEncoder.encode(it.name,"UTF-8").replace("+","%20")+",${it.point.lat},${it.point.lon}"}
+internal fun directionsUrl(route:Route):String {
+ require(route.stops.size in 2..7&&route.stops.all{validNativePoint(it.point)})
+ return "https://map.kakao.com/link/by/car/" + route.stops.joinToString("/"){java.net.URLEncoder.encode(it.name,"UTF-8").replace("+","%20")+",${it.point.lat},${it.point.lon}"}
+}
 internal fun regionFor(route:Route)=when(route.id){"coast"->"강릉";"forest"->"담양";else->"춘천"}
 @Composable internal fun RoadStats(route:Route){val c=LocalContext.current;val r=remember(route.id){readRoad(c,route.id)};Text(String.format(Locale.KOREA,"%.1f km · 주행 약 %.0f분",r.meters/1000,r.seconds/60),fontSize=22.sp,fontWeight=FontWeight.Bold,color=Ink);Text("OSRM 추정 · 정차·교통상황 제외",fontSize=13.sp,color=Muted)}
 @Composable internal fun PhotoAttribution(route:Route){val c=LocalContext.current;val p=photoCredit(route);Text(p.caption,fontSize=13.sp,color=Muted);TextButton(onClick={openWeb(c,p.source)},contentPadding=PaddingValues(0.dp)){Text("사진: ${p.author} · ${p.license} ↗",fontSize=12.sp)}}
@@ -108,6 +114,8 @@ internal fun regionFor(route:Route)=when(route.id){"coast"->"강릉";"forest"->"
       Text("도착지",fontSize=13.sp,color=Muted)
       Text(route.stops.last().name,fontSize=22.sp,fontWeight=FontWeight.Bold,color=Ink,modifier=Modifier.padding(top=5.dp))
       Text("${route.stops.size}개 지점 · 출발 전 내비에서 경로를 확인하세요.",fontSize=14.sp,color=Muted,modifier=Modifier.padding(top=7.dp))
+      Text("앱 지도 선은 기본 코스입니다. 선택 휴식지는 도로 시간 계산·외부 내비 요청에 반영됩니다.",fontSize=16.sp,lineHeight=23.sp,color=Muted,modifier=Modifier.padding(top=8.dp))
+      Text("현재 위치·왕복 출발지는 포함하지 않은 공개 지점 여정입니다. 휴식 장소는 공식 지도 대표점이며 차량 진입구·당일 주차 가능 여부는 미확인입니다.",fontSize=15.sp,color=Muted)
      }
      SecondaryButton(if(status.confirmed) "다른 도착지 검색" else "기본 내비 화면 보기",if(status.confirmed) onNativeSearch else onNativeOpen,Modifier.fillMaxWidth())
      OutlinedButton(onClick={advanced=!advanced},modifier=Modifier.fillMaxWidth().heightIn(min=76.dp),shape=androidx.compose.foundation.shape.RoundedCornerShape(14.dp)){
@@ -119,7 +127,9 @@ internal fun regionFor(route:Route)=when(route.id){"coast"->"강릉";"forest"->"
      if(advanced){
       Text("공개 좌표로 코스 전달",fontSize=20.sp,fontWeight=FontWeight.Bold,color=Ink)
       Text("시작점·경유지·도착점을 기본 내비에 보냅니다. 기존 내비 경로가 바뀔 수 있어요. POI ID 없는 요청은 거절될 수 있으며, 완료 콜백과 좌표 대조 전에는 성공이 아닙니다.",fontSize=15.sp,lineHeight=23.sp,color=Muted)
-      SecondaryButton("전체 코스 전달 · 실험",onNativeRoute,Modifier.fillMaxWidth())
+      route.stops.forEachIndexed{index,stop->Text("${index+1}. ${stop.name} · ${String.format(Locale.US,"%.6f, %.6f",stop.point.lat,stop.point.lon)}",fontSize=15.sp,color=Muted)}
+      if(RestItinerary.nativeFullRouteSupported(route))SecondaryButton("이 좌표를 기본 내비에 전달 · 실험",onNativeRoute,Modifier.fillMaxWidth())
+      else Text("기본 내비는 목적지 포함 최대 3곳만 지원합니다. 전체 전달 없이 아래에서 지점을 하나씩 선택하세요. 지점을 생략하지 않습니다.",fontSize=16.sp,color=Coral)
       HorizontalDivider(color=Line)
       Text("구간별 안내",fontSize=20.sp,fontWeight=FontWeight.Bold,color=Ink)
       Text("주차 후 목적지 하나씩 선택하세요. 기존 내비 경로가 바뀝니다. 자동 구간 전환이나 전체 코스 완료 인증은 아닙니다.",fontSize=15.sp,lineHeight=23.sp,color=Muted)

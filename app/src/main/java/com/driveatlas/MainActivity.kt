@@ -142,21 +142,21 @@ class MainActivity : ComponentActivity() {
                     else Column(Modifier.fillMaxSize().verticalScroll(pageScroll)
                         .padding(horizontal = if (wide) 36.dp else 24.dp, vertical = 30.dp)) {
                         when (page) {
-                            "auto-eta" -> AutoEtaPage(onCurrentPoint={connections.currentPlanningPoint()},onCanCalculate={engine.canEdit},
+                            "auto-eta" -> AutoEtaPage(snapshot=familyEngine.snapshot,onCurrentPoint={connections.currentPlanningPoint()},onCanCalculate={engine.canEdit},
                                 onApply={value->var ok=false;act { if(engine.canEdit)ok=familyEngine.plan(value.routeId,withEta(familyEngine.snapshot.plans[value.routeId]?:FamilyPlan(),value),engine.safety) };ok},
                                 onFamily={page="family"})
                             "family" -> FamilyPage(familyEngine.snapshot,
-                                onPreferences = { value -> act { familyEngine.preferences(value, engine.safety) } },
-                                onPlan = { id, plan -> act { familyEngine.plan(id, plan, engine.safety) } },
+                                onPreferences = { value -> var ok=false;act { ok=familyEngine.preferences(value, engine.safety) };ok },
+                                onPlan = { id, plan -> var ok=false;act { ok=familyEngine.plan(id, plan, engine.safety) };ok },
                                 onRoute = ::open, onMemory = { page = "family-memory" })
                             "family-memory" -> FamilyMemoriesPage(familyEngine.snapshot,
-                                onSave = { id, route, rating, note, simulated ->
+                                onSave = { id, route, rating, note, simulated, tripDate, feelings ->
                                     var saved = false
-                                    act { saved = familyEngine.remember(id, route, rating, note, System.currentTimeMillis(), engine.safety, simulated)
+                                    act { saved = familyEngine.remember(id, route, rating, note, System.currentTimeMillis(), engine.safety, simulated, tripDate, feelings)
                                         if (saved) message = if (simulated) "시연 기억을 저장했어요. 추천 평점에서는 제외합니다." else "가족의 기억을 저장하고 다음 추천에 평가를 반영했어요." }
                                     saved
                                 }, onCompare = { page = "family" },
-                                onEdit = { id, rating, note -> var ok=false; act { ok=familyEngine.editMemory(id,rating,note,engine.safety) };ok },
+                                onEdit = { id, rating, note, tripDate, feelings -> var ok=false; act { ok=familyEngine.editMemory(id,rating,note,engine.safety,tripDate,feelings) };ok },
                                 onDelete = { id -> var ok=false;act { ok=familyEngine.deleteMemory(id,engine.safety) };ok })
                             "discover" -> GuideHome(engine.snapshot, { curation = it; page = "curation" },
                                 onTrip = { page = "trip" }, onAtlas = { page = "atlas" }, onRoute = ::open, filters = filters)
@@ -205,11 +205,17 @@ class MainActivity : ComponentActivity() {
         if (debug) ConnectionsDialog(connectionState, onDismiss = { debug = false }, onRetry = { connections.retry() }, onLocationPermission = {
             if (engine.canEdit) permissionRequest.launch(PleosConnections.LOCATION_PERMISSION)
         })
-        if (engine.canEdit && navDialog) RealNavigationDialog(selected, connectionState.navigation,
-            onNativeSearch = { connections.openNativeSearch(selected) }, onNativeRoute = { connections.requestNativeRoute(selected) },
-            onNativeOpen = { connections.showNative() }, onNativeLeg = { index -> connections.requestNativeLeg(selected,index) }, onDismiss = { navDialog = false }, onStart = {
+        val navigationPlan=familyEngine.snapshot.plans[selected.id]?:FamilyPlan()
+        val plannedNavigation=RestItinerary.route(selected.id,navigationPlan.effectiveRestFacilityIds,navigationPlan.restAfterStopIndex)
+        if (engine.canEdit && navDialog && plannedNavigation==null) AlertDialog(onDismissRequest={navDialog=false},title={Text("경유지 확인 필요")},text={Text("선택한 휴식 장소·좌표·순서를 확인할 수 없어 지도에 보내지 않았어요. 가족 계획에서 확인해 주세요.")},confirmButton={TextButton(onClick={navDialog=false;page="family"}){Text("가족 계획 확인")}})
+        if (engine.canEdit && navDialog && plannedNavigation!=null) {
+         LaunchedEffect(plannedNavigation){connections.invalidatePlannedRoute()}
+         RealNavigationDialog(plannedNavigation, connectionState.navigation,
+            onNativeSearch = { connections.openNativeSearch(plannedNavigation) }, onNativeRoute = { connections.requestNativeRoute(plannedNavigation) },
+            onNativeOpen = { connections.showNative() }, onNativeLeg = { index -> connections.requestNativeLeg(plannedNavigation,index) }, onDismiss = { navDialog = false }, onStart = {
             act { engine.setLocation(LocationStatus.AVAILABLE); if (engine.start(selected.id, System.currentTimeMillis())) { navDialog = false; page = "trip"; message = "모의 여정을 시작했어요. 실제 내비 안내나 방문 인증은 아닙니다." } }
         })
+        }
         if (engine.canEdit && archiveDialog) ArchiveDialog(onDismiss = { archiveDialog = false }) { status ->
             act { if (engine.archive(status, System.currentTimeMillis())) { archiveDialog = false; page = "records"; message = "여행 기록만 남겼어요. 완주 우표는 발급하지 않았습니다." } }
         }

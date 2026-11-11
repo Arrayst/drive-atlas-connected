@@ -1,6 +1,8 @@
 package com.driveatlas
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -18,7 +20,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-@Composable internal fun AutoEtaPage(onCurrentPoint:()->Point?,onCanCalculate:()->Boolean,onApply:(EtaEstimate)->Boolean,onFamily:()->Unit) {
+@Composable internal fun AutoEtaPage(snapshot:FamilySnapshot,onCurrentPoint:()->Point?,onCanCalculate:()->Boolean,onApply:(EtaEstimate)->Boolean,onFamily:()->Unit) {
  val context=LocalContext.current;val cache=remember{EtaCache(context)};val scope=rememberCoroutineScope()
  var routeId by remember{mutableStateOf(Catalog.routes.first().id)}
  var originId by remember{mutableStateOf<String?>(DepartureReferences.all.first().id)}
@@ -28,7 +30,11 @@ import java.util.Locale
  var message by remember{mutableStateOf("")};var consent by remember{mutableStateOf<EtaRequest?>(null)}
  var busy by remember{mutableStateOf(false)};var job by remember{mutableStateOf<Job?>(null)}
  var generation by remember{mutableIntStateOf(0)}
- val cached=cache.load(originId,routeId,System.currentTimeMillis())
+ val selectedRestIds=(snapshot.plans[routeId]?:FamilyPlan()).effectiveRestFacilityIds
+ val restSlots=(snapshot.plans[routeId]?:FamilyPlan()).restAfterStopIndex
+ val requestPreview=EtaRequest(routeId,origin,originLabel,originId,selectedRestIds,true,restAfterStopIndex=restSlots)
+ val cached=cache.load(requestPreview,System.currentTimeMillis())
+ LaunchedEffect(routeId,selectedRestIds,restSlots){generation++;job?.cancel();busy=false;result=null;consent=null}
  fun reset(){generation++;result=null;message=""}
  fun runCalculation(request:EtaRequest){
   if(!onCanCalculate()){message="주차 상태를 다시 확인한 뒤 계산하세요.";return}
@@ -46,7 +52,7 @@ import java.util.Locale
  var editOrigin by remember { mutableStateOf(false) }
  var details by remember { mutableStateOf(false) }
  val route=Catalog.routes.first{it.id==routeId}
- TripHeading("돌아오는 길까지, 얼마나 걸릴까요?","출발부터 복귀까지 도로 시간을 확인하고 가족 계획에 더하세요.")
+ TripHeading("코스까지 가는 길, 즐기고 돌아오는 길","가는 길 · 코스 주행 · 돌아오는 길을 나눠 보고, 걷기와 휴식은 가족 계획에 더하세요.")
  TripWorkspace(first={ pane ->
   Column(pane,verticalArrangement=Arrangement.spacedBy(20.dp)) {
    TripPanel {
@@ -91,9 +97,15 @@ import java.util.Locale
     Text("편도 시간을 두 배로 하지 않고\n돌아오는 도로까지 계산해요.",fontSize=21.sp,lineHeight=32.sp,color=Muted)
    }
    HorizontalDivider(color=Line,modifier=Modifier.padding(vertical=10.dp))
-   TripStop("1",originLabel,v?.let{"코스까지 ${tripDuration(it.outboundMinutes)}"}?:"공개 기준점 또는 직접 선택한 SDK 위치")
-   TripStop("2",route.title,v?.let{"코스 주행 ${tripDuration(it.courseMinutes)}"}?:"${route.stops.size}개 도로 기준점 경유")
-   TripStop("3","같은 출발점으로",v?.let{"돌아오는 길 ${tripDuration(it.returnMinutes)}"}?:"복귀 경로 포함")
+   TripStop("1",originLabel,v?.let{"코스 첫 지점까지 ${tripDuration(it.outboundMinutes)} · 선택한 경유 순서 기준"}?:"공개 기준점 또는 직접 선택한 SDK 위치")
+   TripStop("2",route.title,v?.let{"코스 첫 지점 → 마지막 지점 ${tripDuration(it.courseMinutes)}"}?:"${route.stops.size}개 도로 기준점 경유")
+   selectedRestIds.sortedBy{restSlots[it]?:route.stops.lastIndex}.forEach { id -> RestFacilities.find(id,routeId)?.let { facility ->
+    TripStop("쉼",facility.name,if(facility.point==null)"좌표 미확인 · 계산할 수 없음" else "공개 시설 좌표 · 차량 진입점 미검증")
+   }}
+   if(selectedRestIds.isNotEmpty())Text("실제 경유 순서: "+(RestItinerary.route(routeId,selectedRestIds,restSlots)?.stops?.joinToString(" → "){it.name}?:"좌표 확인 필요"),fontSize=18.sp,color=Ink)
+   if(selectedRestIds.isNotEmpty())Text("가족 계획에서 지정한 코스 구간에 휴식지를 삽입합니다. 휴식·걷기·여유 시간은 도로 예상 시간에 포함하지 않습니다.",fontSize=18.sp,color=Muted)
+   if(!busy)SecondaryButton("휴식 장소·순서 변경",onFamily,Modifier.fillMaxWidth())
+   TripStop("3","같은 출발점으로",v?.let{"코스 마지막 지점 → 출발 ${tripDuration(it.returnMinutes)} · 선택한 경유 순서 기준"}?:"복귀 경로 포함")
    Spacer(Modifier.height(8.dp))
    if(busy){
     LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -107,7 +119,8 @@ import java.util.Locale
     PrimaryButton("전송 정보 확인 후 계산",{
      val p=if(originId==null)onCurrentPoint() else origin
      if(p==null)message="위치 수신이 오래되어 계산을 시작하지 않았어요. 공개 기준점을 선택하세요."
-     else{origin=p;consent=EtaRequest(routeId,p,originLabel,originId)}
+     else if(RestItinerary.route(routeId,selectedRestIds,restSlots)==null)message="선택한 휴식 장소의 좌표를 확인할 수 없어 계산하지 않았어요. 가족 계획에서 해당 장소를 제외해 주세요."
+     else{origin=p;consent=EtaRequest(routeId,p,originLabel,originId,selectedRestIds,restAfterStopIndex=restSlots)}
     },Modifier.fillMaxWidth())
     if(cached!=null)SecondaryButton("저장된 공개 결과 보기",{result=cached;message="저장된 공개 기준점 결과입니다. 현재 도로·교통 상태를 새로 확인한 값이 아닙니다."},Modifier.fillMaxWidth())
    }
@@ -127,12 +140,17 @@ import java.util.Locale
   TextButton(onClick={openWeb(context,"https://project-osrm.org/")},modifier=Modifier.heightIn(min=76.dp)){Text("Routing: OSRM · 제공 정보",fontSize=18.sp)}
   TextButton(onClick={openWeb(context,"https://www.openstreetmap.org/fixthemap")},modifier=Modifier.heightIn(min=76.dp)){Text("지도 오류 수정 안내",fontSize=18.sp)}
  }
- consent?.let{request->AlertDialog(onDismissRequest={consent=null},properties=DialogProperties(usePlatformDefaultWidth=false),modifier=Modifier.widthIn(max=900.dp).fillMaxWidth(.9f),title={Text("이번 경로 요청에 동의할까요?",fontSize=28.sp)},text={ProvideTextStyle(androidx.compose.ui.text.TextStyle(fontSize=20.sp,lineHeight=31.sp)){Column(verticalArrangement=Arrangement.spacedBy(16.dp)){
+ consent?.let{request->AlertDialog(onDismissRequest={consent=null},properties=DialogProperties(usePlatformDefaultWidth=false),modifier=Modifier.widthIn(max=900.dp).fillMaxWidth(.9f),title={Text("이번 경로 요청에 동의할까요?",fontSize=28.sp)},text={ProvideTextStyle(androidx.compose.ui.text.TextStyle(fontSize=20.sp,lineHeight=31.sp)){Column(Modifier.heightIn(max=440.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(16.dp)){
   Text("받는 곳: FOSSGIS가 운영하는 OSRM 공개 라우팅 서버 (router.project-osrm.org).")
-  Text("보내는 데이터: 선택한 출발 좌표 ${String.format(Locale.US,"%.5f, %.5f",request.origin.lat,request.origin.lon)}와 ${Catalog.routes.first{it.id==request.routeId}.title}의 공개 코스 좌표. 같은 출발점으로 돌아오는 경로를 계산합니다.")
+  Text("보내는 데이터: 선택한 출발 좌표 ${String.format(Locale.US,"%.5f, %.5f",request.origin.lat,request.origin.lon)}와 ${Catalog.routes.first{it.id==request.routeId}.title}의 공개 코스 좌표 및 아래 선택 휴식지 좌표. 설정한 코스·휴식 순서대로 경유한 뒤 같은 출발점으로 복귀합니다.")
+  Text("경유 순서: "+(RestItinerary.route(request.routeId,request.selectedRestIds,request.restAfterStopIndex)?.stops?.joinToString(" → "){it.name}?:"좌표 확인 필요"))
+  request.selectedRestIds.forEach { id -> RestFacilities.find(id,request.routeId)?.let { f ->
+   Text("${f.name}: ${f.point?.let{String.format(Locale.US,"%.5f, %.5f",it.lat,it.lon)}?:"좌표 없음"} · ${f.coordinateNote}")
+  }}
+  if(request.selectedRestIds.isNotEmpty())Text("공개 시설 위치는 차량 출입구로 검증되지 않았습니다. 도로에 맞춘 위치로 계산될 수 있어 실제 진입·회차 경로와 다를 수 있습니다. 이 한계를 확인하고 해당 좌표 전송에 동의합니다.")
   Text("서버에 요청이 기록됩니다. 이름·가족 메모·평가는 보내지 않습니다. ${if(request.publicReferenceId==null)"개인 위치 전송은 이동 정보를 노출할 수 있으며, 이 앱은 해당 좌표를 캐시하지 않습니다." else "선택한 공개 출발 기준점을 보냅니다."}")
  }}},confirmButton={TextButton(modifier=Modifier.heightIn(min=76.dp),onClick={consent=null
   val current=if(request.publicReferenceId==null)onCurrentPoint() else request.origin
   if(current==null||!nativePointMatches(request.origin,current)){message="위치가 변경되었거나 수신이 오래됐어요. 출발점을 다시 확인하세요."}
-  else runCalculation(request)}){Text("이번 요청에 동의하고 계산",fontSize=20.sp)}},dismissButton={TextButton(modifier=Modifier.sizeIn(minWidth=90.dp,minHeight=76.dp),onClick={consent=null}){Text("취소",fontSize=20.sp)}})}
+  else runCalculation(request.copy(allowApproximateRestPoints=true))}){Text("이번 요청에 동의하고 계산",fontSize=20.sp)}},dismissButton={TextButton(modifier=Modifier.sizeIn(minWidth=90.dp,minHeight=76.dp),onClick={consent=null}){Text("취소",fontSize=20.sp)}})}
 }

@@ -12,19 +12,48 @@ internal object DepartureReferences {
   DepartureReference("busan","부산시청 공개 기준점",Point(35.17994,129.07521),"https://www.openstreetmap.org/way/468977727")
  )
 }
-internal data class EtaRequest(val routeId:String,val origin:Point,val originLabel:String,val publicReferenceId:String?=null) {
- fun points():List<Point> = listOf(origin)+Catalog.routes.first{it.id==routeId}.stops.map{it.point}+origin
+internal data class EtaRequest(val routeId:String,val origin:Point,val originLabel:String,val publicReferenceId:String?=null,
+ val selectedRestIds:List<String> = emptyList(),val allowApproximateRestPoints:Boolean=false,
+ val restAfterStopIndex:Map<String,Int> = emptyMap()) {
+ fun points():List<Point> = listOf(origin)+requireNotNull(RestItinerary.route(routeId,selectedRestIds,restAfterStopIndex)).stops.map{it.point}+origin
+ fun itineraryKey():String = itineraryIdentity(routeId,selectedRestIds,restAfterStopIndex)
  fun valid() = Catalog.routes.any{it.id==routeId} && validNativePoint(origin) && originLabel.isNotBlank() &&
+  RestItinerary.route(routeId,selectedRestIds,restAfterStopIndex)!=null && (selectedRestIds.isEmpty()||allowApproximateRestPoints) &&
   (publicReferenceId==null||DepartureReferences.all.any{it.id==publicReferenceId&&it.point==origin})
 }
 internal data class EtaEstimate(val routeId:String,val originLabel:String,val outboundSeconds:Double,
- val courseSeconds:Double,val returnSeconds:Double,val meters:Double,val calculatedAt:Long,val cached:Boolean=false) {
+ val courseSeconds:Double,val returnSeconds:Double,val meters:Double,val calculatedAt:Long,val cached:Boolean=false,
+ val itineraryKey:String="",val legSeconds:List<Double> = emptyList(),val restBreakAfterLegs:List<Int> = emptyList(),
+ val selectedRestIds:List<String> = emptyList(),val restAfterStopIndex:Map<String,Int> = emptyMap()) {
  val outboundMinutes get()=ceil(outboundSeconds/60).toInt()
  val courseMinutes get()=ceil(courseSeconds/60).toInt()
  val returnMinutes get()=ceil(returnSeconds/60).toInt()
  val roadMinutes get()=outboundMinutes+courseMinutes+returnMinutes
+ val longestContinuousDrivingMinutes:Int? get()=longestDriveMinutes(legSeconds,restBreakAfterLegs)
  fun valid()=Catalog.routes.any{it.id==routeId}&&originLabel.isNotBlank()&&
+  RestItinerary.route(routeId,selectedRestIds,restAfterStopIndex)!=null &&
+  (legSeconds.isEmpty()&&selectedRestIds.isEmpty() || legSeconds.size==RestItinerary.route(routeId,selectedRestIds,restAfterStopIndex)!!.stops.size+1 &&
+   legSeconds.all{it.isFinite()&&it in 0.0..43200.0} && partitionsMatch() && itineraryKey==itineraryIdentity(routeId,selectedRestIds,restAfterStopIndex) &&
+   restBreakAfterLegs==RestItinerary.breakAfterLegs(routeId,selectedRestIds,restAfterStopIndex)) &&
   listOf(outboundSeconds,courseSeconds,returnSeconds).all{it.isFinite()&&it in 0.0..43200.0}&&meters.isFinite()&&meters in 0.0..3_000_000.0&&calculatedAt>0
+ private fun partitionsMatch():Boolean {
+  val route=RestItinerary.route(routeId,selectedRestIds,restAfterStopIndex)?:return false
+  val count=route.stops.indexOf(Catalog.routes.first{it.id==routeId}.stops.first())+1
+  val end=route.stops.indexOf(Catalog.routes.first{it.id==routeId}.stops.last())+1
+  return abs(legSeconds.take(count).sum()-outboundSeconds)<=1.0 &&
+   abs(legSeconds.subList(count,end).sum()-courseSeconds)<=1.0 && abs(legSeconds.drop(end).sum()-returnSeconds)<=1.0
+ }
+}
+internal fun longestDriveMinutes(legs:List<Double>,breaks:List<Int>):Int? {
+ if(legs.isEmpty()||legs.any{!it.isFinite()||it<0}||breaks.any{it !in 0 until legs.lastIndex}||breaks.distinct().size!=breaks.size)return null
+ var longest=0.0;var segment=0.0
+ legs.forEachIndexed{i,seconds->segment+=seconds;if(i in breaks){longest=max(longest,segment);segment=0.0}}
+ return ceil(max(longest,segment)/60).toInt()
+}
+internal fun itineraryIdentity(routeId:String,ids:List<String>,slots:Map<String,Int> = emptyMap()):String {
+ val route=RestItinerary.route(routeId,ids,slots)?:return ""
+ val raw="v2|$routeId|"+ids.joinToString(",")+"|"+ids.joinToString(","){"$it:${slots[it]?:Catalog.routes.first{r->r.id==routeId}.stops.lastIndex}"}+"|"+route.stops.joinToString(";"){"${it.name}:${it.point.lat},${it.point.lon}"}
+ return java.security.MessageDigest.getInstance("SHA-256").digest(raw.toByteArray(Charsets.UTF_8)).joinToString(""){"%02x".format(it)}
 }
 internal class EtaUnavailable(val kind:String):Exception(kind)
 internal fun etaUrl(request:EtaRequest):String {
@@ -55,7 +84,12 @@ internal fun parseEta(request:EtaRequest,body:String,now:Long):EtaEstimate {
   if(distances.any{!it.isFinite()||it !in 0.0..3_000_000.0})throw EtaUnavailable("InvalidResponse")
   val total=route.getDouble("duration");val totalDistance=route.getDouble("distance")
   if(!total.isFinite()||total<0||abs(total-durations.sum())>1.0||!totalDistance.isFinite()||totalDistance<0||abs(totalDistance-distances.sum())>1.0)throw EtaUnavailable("InvalidResponse")
-  val value=EtaEstimate(request.routeId,request.originLabel,durations.first(),durations.drop(1).dropLast(1).sum(),durations.last(),route.getDouble("distance"),now)
+  val itinerary=RestItinerary.route(request.routeId,request.selectedRestIds,request.restAfterStopIndex)!!
+  val firstCourseStop=Catalog.routes.first{it.id==request.routeId}.stops.first()
+  val outboundLegCount=itinerary.stops.indexOf(firstCourseStop)+1
+  val courseEndLegCount=itinerary.stops.indexOf(Catalog.routes.first{it.id==request.routeId}.stops.last())+1
+  val value=EtaEstimate(request.routeId,request.originLabel,durations.take(outboundLegCount).sum(),durations.subList(outboundLegCount,courseEndLegCount).sum(),durations.drop(courseEndLegCount).sum(),route.getDouble("distance"),now,
+   itineraryKey=request.itineraryKey(),legSeconds=durations,restBreakAfterLegs=RestItinerary.breakAfterLegs(request.routeId,request.selectedRestIds,request.restAfterStopIndex),selectedRestIds=request.selectedRestIds.toList(),restAfterStopIndex=request.restAfterStopIndex.toMap())
   if(!value.valid())throw EtaUnavailable("InvalidResponse")
   return value
  }catch(e:EtaUnavailable){throw e}catch(_:Exception){throw EtaUnavailable("InvalidResponse")}
@@ -71,5 +105,5 @@ internal fun etaErrorMessage(kind:String)=when(kind){
 }
 
 internal fun publicEtaCacheKey(request:EtaRequest):String? =
- if(request.valid()&&request.publicReferenceId!=null)request.publicReferenceId+":"+request.routeId else null
+ if(request.valid()&&request.publicReferenceId!=null)"v2:"+request.publicReferenceId+":"+request.origin.lat+","+request.origin.lon+":"+request.itineraryKey() else null
 internal fun freshCachedEta(value:EtaEstimate,now:Long)=value.valid()&&now>=value.calculatedAt&&now-value.calculatedAt<=24*60*60*1000L
