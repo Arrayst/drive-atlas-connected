@@ -158,11 +158,11 @@ class MainActivity : ComponentActivity() {
                                 onSave = { id, route, rating, note, simulated, tripDate, feelings ->
                                     var saved = false
                                     act { saved = familyEngine.remember(id, route, rating, note, System.currentTimeMillis(), engine.safety, simulated, tripDate, feelings)
-                                        if (saved) message = if (simulated) "시연 기억을 저장했어요. 추천 평점에서는 제외합니다." else "가족의 기억을 저장하고 다음 추천에 평가를 반영했어요." }
+                                        if (saved) message = if (simulated) "시연 기억을 저장했어요. 가족 비교 추천 평점에서는 제외합니다." else "가족의 기억을 저장하고 가족 비교에 평점을 반영했어요." }
                                     saved
                                 }, onCompare = { page = "family" },
                                 onEdit = { id, rating, note, tripDate, feelings -> var ok=false; act { ok=familyEngine.editMemory(id,rating,note,engine.safety,tripDate,feelings) };ok },
-                                onDelete = { id -> var ok=false;act { ok=familyEngine.deleteMemory(id,engine.safety) };ok })
+                                onDelete = { id -> var ok=false;act { ok=familyEngine.deleteMemory(id,engine.safety) };ok }, currentTrip = engine.snapshot.trip)
                             "discover" -> GuideHome(engine.snapshot, { curation = it; page = "curation" },
                                 onTrip = { page = "trip" }, onAtlas = { page = "atlas" }, onRoute = ::open, filters = filters)
                             "curation" -> CurationPage(curation, filters, engine.snapshot.awards, ::open, { page = "discover" })

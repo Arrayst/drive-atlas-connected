@@ -4,7 +4,7 @@ The full-window course preview, public-coordinate SIM replay, and all public cou
 
 ## Data and permissions
 
-- The shared connection gate appears before MapLibre initialization or creation of a native MapView. It is separate from OSRM routing consent and is session-only. SIM replay remains debug/emulator-only. Public course/place exploration remains available in release after consent, preserving the existing public-map feature without enabling real navigation.
+- The shared connection gate appears before MapLibre initialization or creation of a native MapView. It is separate from OSRM routing consent. Explicit acceptance is now persisted locally for the shared public-course/reference-map scope; see [SIM start and map consent](SIM_START_AND_MAP_CONSENT.md). SIM replay remains debug/emulator-only. Public course/place exploration remains available in release after consent, preserving the existing public-map feature without enabling real navigation.
 - Consent explains the public displayed region and IP transmission to OpenFreeMap/Cloudflare, terms, privacy, internet dependency, and lack of traffic, SLA, offline navigation or real-driving certification. It never sends device GPS, home addresses or family records.
 - TileJSON: `https://tiles.openfreemap.org/planet/latest`. Its actual vector-layer metadata was checked on 2026-11-12. Runtime follows the stable TileJSON URL, not a pinned weekly tile path.
 - Glyphs: `https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf`, with the published Noto Sans Regular stack. Android's local sans-serif fallback generates Korean/CJK glyphs. Device font appearance needs emulator verification.
@@ -20,7 +20,7 @@ The full-window course preview, public-coordinate SIM replay, and all public cou
 - Long GeoJSON line sections update once per replay tick. Only that tick's short, real road-vertex links and vehicle position animate. This avoids rebuilding a 100,000-vertex route at frame rate.
 - All route/stop/vehicle layers start hidden. A loaded style alone is insufficient: actual road features must render. A blank viewport clears previous road-evidence state. Loading errors hide overlays and expose retry rather than presenting a route on an empty map.
 - MapView start/resume/pause/stop/destroy follow Compose lifecycle. No location component or device-heading subscription is enabled.
-- Existing OSRM steps, TTS, replay controls and P/vehicle safety checks are unchanged.
+- Existing OSRM step geometry and P/vehicle safety checks are preserved. The newer explicit start flow and bounded on-device speech update are documented in [SIM start and map consent](SIM_START_AND_MAP_CONSENT.md).
 
 ## Dependency and license
 

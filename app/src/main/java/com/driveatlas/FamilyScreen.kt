@@ -182,7 +182,7 @@ import java.util.UUID
    FilterChip(selected=draft.restroomRequired,onClick={draft=draft.copy(restroomRequired=!draft.restroomRequired)},label={Text("화장실 필수")},modifier=Modifier.heightIn(min=76.dp))
    FilterChip(selected=draft.strollerRequired,onClick={draft=draft.copy(strollerRequired=!draft.strollerRequired)},label={Text("유모차 이동")},modifier=Modifier.heightIn(min=76.dp))
   }
-  Text("다음 추천에서 바꾸고 싶은 점",fontSize=21.sp,fontWeight=FontWeight.Bold,color=Ink)
+  Text("가족 비교에서 바꾸고 싶은 점",fontSize=21.sp,fontWeight=FontWeight.Bold,color=Ink)
   Text("직접 선택한 조건만 비교에 반영합니다. 메모를 분석하거나 자동 학습하지 않습니다.",fontSize=17.sp,color=Muted)
   FeedbackChoices(draft.feedback){draft=draft.copy(feedback=it)}
   if(error)Text("저장하지 못했어요. 주차 상태와 입력을 확인하세요.",color=Coral)
@@ -313,110 +313,174 @@ private fun clockLabel(minute:Int?)=minute?.let{String.format(Locale.KOREA,"%02d
 @OptIn(ExperimentalLayoutApi::class)
 @Composable internal fun FamilyMemoriesPage(snapshot:FamilySnapshot,
  onSave:(String,String,Int,String,Boolean,String?,List<String>)->Boolean,onCompare:()->Unit,
- onEdit:(String,Int,String,String?,List<String>)->Boolean,onDelete:(String)->Boolean) {
+ onEdit:(String,Int,String,String?,List<String>)->Boolean,onDelete:(String)->Boolean,
+ currentTrip:Trip?=null) {
  ProvideTextStyle(androidx.compose.ui.text.TextStyle(fontSize=18.sp,lineHeight=28.sp,color=Ink)) {
- TripHeading("우리 차의 여행 기억","직접 남긴 경험과 평가를 모아, 다음 길을 고를 때 참고하세요.")
+ TripHeading("우리 차의 여행 기억","어떤 여행이었나요? 코스와 기록 종류를 고른 뒤 만족도를 남겨 주세요.")
  Text("계정·클라우드 없이 이 앱 안에 저장됩니다. 직접 남긴 기록은 GPS 방문 인증이나 완주 배지가 아닙니다. 개인 신상이나 건강정보는 메모에 넣지 마세요.",color=Muted,modifier=Modifier.padding(bottom=24.dp))
- var routeId by rememberSaveable{mutableStateOf(Catalog.routes.first().id)}
- var rating by rememberSaveable{mutableIntStateOf(4)}
- var note by rememberSaveable{mutableStateOf("")}
- var simulated by rememberSaveable{mutableStateOf(false)}
- var tripDate by rememberSaveable{mutableStateOf(java.time.LocalDate.now().toString())}
- var feelings by rememberSaveable{mutableStateOf(emptyList<String>())}
- var saveError by remember{mutableStateOf(false)}
- var id by rememberSaveable{mutableStateOf(UUID.randomUUID().toString())}
+ var newDraftId by rememberSaveable{mutableStateOf<String?>(null)}
  var editId by rememberSaveable{mutableStateOf<String?>(null)}
- var editNote by rememberSaveable{mutableStateOf("")}
- var editRating by rememberSaveable{mutableIntStateOf(4)}
- var editDate by rememberSaveable{mutableStateOf("")}
- var editFeelings by rememberSaveable{mutableStateOf(emptyList<String>())}
  var deleteId by rememberSaveable{mutableStateOf<String?>(null)}
- val saved=snapshot.memories.any{it.id==id}
+ var savedMessage by rememberSaveable{mutableStateOf("")}
  TripWorkspace(firstWeight=.48f,first={ pane ->
- Column(pane) {
- Text(snapshot.preferences.carName,fontSize=18.sp,color=Muted)
- Text("새로운 기억 남기기",fontSize=28.sp,fontWeight=FontWeight.Bold,color=Ink,modifier=Modifier.padding(top=6.dp,bottom=20.dp))
- Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(12.dp),colors=CardDefaults.cardColors(containerColor=White)) {
- Column(Modifier.padding(24.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
- Text(if(saved) "저장한 기억" else "코스와 만족도",fontSize=21.sp,fontWeight=FontWeight.Bold,color=Ink)
- if(!saved) {
-  Text("기억할 길",color=Muted,fontSize=18.sp)
-  Catalog.routes.forEach { route ->
-   FilterChip(selected=routeId==route.id,onClick={routeId=route.id},label={Text(route.title,fontSize=18.sp)},modifier=Modifier.fillMaxWidth().heightIn(min=76.dp),shape=RoundedCornerShape(12.dp),colors=FilterChipDefaults.filterChipColors(selectedContainerColor=AtlasSoft,selectedLabelColor=AtlasGreen))
+  Column(pane,verticalArrangement=Arrangement.spacedBy(16.dp)) {
+   TripPanel(Modifier.fillMaxWidth()) {
+    Text(snapshot.preferences.carName,fontSize=18.sp,color=Muted)
+    Text("여행은 어땠나요?",fontSize=28.sp,fontWeight=FontWeight.Bold,color=Ink)
+    Text("코스 · 실제 여행/SIM · 만족도만 선택하면 됩니다. 날짜와 메모, 느낌은 원할 때 덧붙이세요.",color=Muted)
+    if(savedMessage.isNotEmpty())Text(savedMessage,color=Coral)
+    if(snapshot.memories.size>=500)Text("이 기기의 기억 500개 한도에 도달했어요. 기존 기록은 자동 삭제하지 않습니다. 직접 불필요한 기억을 삭제한 뒤 새 기억을 저장하세요.",color=Coral)
+    PrimaryButton("새로운 기억 남기기",{newDraftId=UUID.randomUUID().toString();savedMessage=""},Modifier.fillMaxWidth(),enabled=snapshot.memories.size<500)
+   }
+   TripPanel(Modifier.fillMaxWidth()) {
+    Text("평점은 어디에 쓰이나요?",fontSize=22.sp,fontWeight=FontWeight.Bold,color=Ink)
+    Text("실제 여행 평점만 ‘가족 비교’의 코스 정렬에 반영합니다. 가족 조건과 개선 선택을 먼저 비교하고, 그다음 코스별 평균 평점을 참고해요.",color=Muted)
+    Text("홈 추천은 바꾸지 않습니다. SIM 평점과 날짜·메모·느낌은 가족 비교 점수에 반영하지 않습니다.",fontSize=17.sp,color=Muted)
+    SecondaryButton("가족 비교에서 보기",onCompare,Modifier.fillMaxWidth())
+   }
   }
-  ChoiceRow("만족도",listOf("1","2","3","4","5"),rating.toString()){rating=it.toInt()}
-  MemoryDetailsEditor(tripDate,feelings,{tripDate=it},{feelings=it})
-  OutlinedTextField(value=note,onValueChange={note=it.take(280)},label={Text("기억하고 싶은 점 (선택, 280자)")},textStyle=androidx.compose.ui.text.TextStyle(fontSize=20.sp,lineHeight=30.sp),modifier=Modifier.fillMaxWidth(),minLines=2)
-  FilterChip(selected=simulated,onClick={simulated=!simulated},label={Text("실제 여행이 아닌 시연 기록 (추천 평점에서 제외)")},modifier=Modifier.heightIn(min=76.dp))
-  if(snapshot.memories.size>=500)Text("이 기기의 기억 500개 한도에 도달했어요. 기존 기록은 자동 삭제하지 않습니다. 직접 불필요한 기억을 삭제한 뒤 새 기억을 저장하세요.",color=Coral)
-  if(saveError)Text("저장하지 못했어요. 입력과 주차 상태를 확인하세요.",color=Coral)
-  PrimaryButton("${snapshot.preferences.carName}의 기억 저장",{saveError=!onSave(id,routeId,rating,note,simulated,tripDate.ifBlank{null},feelings)},Modifier.fillMaxWidth(),enabled=snapshot.memories.size<500&&validMemoryDate(tripDate))
- } else {
-  Text("기억과 평가가 저장됐어요. 같은 기록은 중복 저장하지 않습니다.",color=Coral)
-  SecondaryButton("새로운 기억 남기기",{id=UUID.randomUUID().toString();note="";feelings=emptyList();tripDate=java.time.LocalDate.now().toString();saveError=false},Modifier.fillMaxWidth())
- }
- }
- }
- SecondaryButton("평가를 반영한 다음 길 보기",onCompare,Modifier.fillMaxWidth().padding(vertical=16.dp))
- }
  },second={ pane ->
- Column(pane) {
- Text("우리 차의 기록 ${snapshot.memories.size}개",fontSize=28.sp,fontWeight=FontWeight.Bold,color=Ink)
- Text("직접 남긴 경험 ${snapshot.memories.count{!it.simulated}}개 / 시연 ${snapshot.memories.count{it.simulated}}개",fontSize=18.sp,color=Muted,modifier=Modifier.padding(top=8.dp,bottom=24.dp))
- if(snapshot.memories.isEmpty())TripPanel(Modifier.fillMaxWidth()) {
-  Text("아직 남긴 기억이 없어요",fontSize=24.sp,fontWeight=FontWeight.Bold,color=Ink)
-  Text("여행한 길과 만족도를 남기면 이곳에 모입니다. 날짜와 메모는 선택 사항이에요.",color=Muted)
- }
- snapshot.memories.asReversed().forEach {m ->
-  Card(Modifier.fillMaxWidth().padding(bottom=16.dp),shape=RoundedCornerShape(12.dp),colors=CardDefaults.cardColors(containerColor=White)) {
-   Column(Modifier.padding(20.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-    Text(Catalog.routes.first{it.id==m.routeId}.title,fontWeight=FontWeight.Bold,fontSize=21.sp)
-    Text("${m.carName} · 만족도 ${m.rating}/5")
-    Text("여행 날짜 ${m.tripDate?:"미입력"} · 저장 ${SimpleDateFormat("yyyy.MM.dd",Locale.KOREA).format(Date(m.createdMs))}",color=Muted)
-    Text(if(m.feelingTags.isEmpty())"느낌 미선택" else m.feelingTags.joinToString(" · "),color=Coral)
-    Text(if(m.simulated)"시연 기록 · 추천 평점 제외" else "직접 남긴 경험 · 방문 미인증",color=Muted)
-    if(m.note.isNotBlank())Text(m.note)
-    FlowRow(horizontalArrangement=Arrangement.spacedBy(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-     OutlinedButton(onClick={editId=m.id;editNote=m.note;editRating=m.rating;editDate=m.tripDate?:"";editFeelings=m.feelingTags;saveError=false},modifier=Modifier.heightIn(min=76.dp),shape=RoundedCornerShape(12.dp),border=BorderStroke(1.dp,Line)){Text("기억 수정",fontSize=18.sp)}
-     OutlinedButton(onClick={deleteId=m.id},modifier=Modifier.heightIn(min=76.dp),shape=RoundedCornerShape(12.dp),border=BorderStroke(1.dp,Line)){Text("기억 삭제",fontSize=18.sp)}
+  Column(pane) {
+   Text("우리 차의 기록 ${snapshot.memories.size}개",fontSize=28.sp,fontWeight=FontWeight.Bold,color=Ink)
+   Text("직접 남긴 실제 여행 ${snapshot.memories.count{!it.simulated}}개 / SIM·시연 ${snapshot.memories.count{it.simulated}}개",fontSize=18.sp,color=Muted,modifier=Modifier.padding(top=8.dp,bottom=24.dp))
+   if(snapshot.memories.isEmpty())TripPanel(Modifier.fillMaxWidth()) {
+    Text("아직 남긴 기억이 없어요",fontSize=24.sp,fontWeight=FontWeight.Bold,color=Ink)
+    Text("여행한 길과 만족도를 남기면 이곳에 모입니다. 날짜와 메모는 선택 사항이에요.",color=Muted)
+   }
+   snapshot.memories.asReversed().forEach {m ->
+    Card(Modifier.fillMaxWidth().padding(bottom=16.dp),shape=RoundedCornerShape(12.dp),colors=CardDefaults.cardColors(containerColor=White)) {
+     Column(Modifier.padding(20.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+      Text(Catalog.routes.first{it.id==m.routeId}.title,fontWeight=FontWeight.Bold,fontSize=21.sp)
+      Text("${m.carName} · ${m.rating}/5 · ${familyRatingMeaning(m.rating)}")
+      Text("여행 날짜 ${m.tripDate?:"미입력"} · 저장 ${SimpleDateFormat("yyyy.MM.dd",Locale.KOREA).format(Date(m.createdMs))}",color=Muted)
+      Text(if(m.feelingTags.isEmpty())"느낌 미선택" else m.feelingTags.joinToString(" · "),color=Coral)
+      Text(if(m.simulated)"SIM·시연 기록 · 가족 비교 평점 제외" else "실제 여행으로 남긴 기록 · 방문 미인증",color=Muted)
+      if(m.note.isNotBlank())Text(m.note)
+      FlowRow(horizontalArrangement=Arrangement.spacedBy(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+       OutlinedButton(onClick={editId=m.id},modifier=Modifier.heightIn(min=76.dp),shape=RoundedCornerShape(12.dp),border=BorderStroke(1.dp,Line)){Text("기억 수정",fontSize=18.sp)}
+       OutlinedButton(onClick={deleteId=m.id},modifier=Modifier.heightIn(min=76.dp),shape=RoundedCornerShape(12.dp),border=BorderStroke(1.dp,Line)){Text("기억 삭제",fontSize=18.sp)}
+      }
+     }
     }
    }
   }
- }
- }
  })
- if(editId!=null) Dialog(onDismissRequest={editId=null},properties=DialogProperties(usePlatformDefaultWidth=false)) {
-  Surface(Modifier.widthIn(max=1000.dp).fillMaxWidth(.9f).heightIn(max=850.dp),shape=RoundedCornerShape(12.dp),color=White) {
+ newDraftId?.let { id ->
+  MemoryEditorDialog(FamilyMemoryDraft(id=id),snapshot.memories.size,false,currentTrip,{newDraftId=null}) { draft ->
+   val saved=onSave(draft.id,draft.routeId!!,draft.rating!!,draft.note,draft.kind!!.simulated,draft.tripDate.ifBlank{null},draft.feelingTags)
+   if(saved) {
+    newDraftId=null
+    savedMessage=if(draft.kind==FamilyMemoryKind.SIM)"SIM·시연 기억을 저장했어요. 가족 비교 평점에는 반영하지 않습니다." else "기억을 저장했어요. 실제 여행 평점을 가족 비교에 반영합니다."
+   }
+   saved
+  }
+ }
+ snapshot.memories.firstOrNull{it.id==editId}?.let { memory ->
+  MemoryEditorDialog(FamilyMemoryDraft.from(memory),snapshot.memories.size,true,null,{editId=null}) { draft ->
+   val saved=onEdit(draft.id,draft.rating!!,draft.note,draft.tripDate.ifBlank{null},draft.feelingTags)
+   if(saved)editId=null
+   saved
+  }
+ }
+ if(deleteId!=null) AlertDialog(onDismissRequest={deleteId=null},title={Text("이 기억을 삭제할까요?")},text={Text("이 앱에 저장한 메모와 평점을 삭제합니다. 삭제한 기억은 복구할 수 없습니다. 다른 여행 기록과 우표는 유지됩니다.")},confirmButton={TextButton(modifier=Modifier.heightIn(min=76.dp),onClick={if(onDelete(deleteId!!))deleteId=null}){Text("기억 삭제 확인")}},dismissButton={TextButton(modifier=Modifier.heightIn(min=76.dp),onClick={deleteId=null}){Text("취소")}})
+ }
+}
+
+private val MemoryDraftSaver=androidx.compose.runtime.saveable.mapSaver(
+ save={draft:FamilyMemoryDraft -> mapOf("id" to draft.id,"route" to draft.routeId.orEmpty(),"kind" to (draft.kind?.name?:""),"rating" to (draft.rating?:0),"note" to draft.note,"date" to draft.tripDate,"feelings" to ArrayList(draft.feelingTags))},
+ restore={values -> FamilyMemoryDraft(id=values["id"] as String,routeId=(values["route"] as String).ifEmpty{null},kind=FamilyMemoryKind.entries.firstOrNull{it.name==values["kind"]},rating=(values["rating"] as Int).takeIf{it in 1..5},note=values["note"] as String,tripDate=values["date"] as String,feelingTags=(values["feelings"] as List<*>).filterIsInstance<String>())}
+)
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable private fun MemoryEditorDialog(initialDraft:FamilyMemoryDraft,memoryCount:Int,editing:Boolean,currentTrip:Trip?,onCancel:()->Unit,onSave:(FamilyMemoryDraft)->Boolean) {
+ var draft by rememberSaveable(initialDraft.id,stateSaver=MemoryDraftSaver){mutableStateOf(initialDraft)}
+ var detailsOpen by rememberSaveable(initialDraft.id){mutableStateOf(false)}
+ var saveError by remember{mutableStateOf(false)}
+ Dialog(onDismissRequest=onCancel,properties=DialogProperties(usePlatformDefaultWidth=false)) {
+  Surface(Modifier.widthIn(max=1100.dp).fillMaxWidth(.94f).fillMaxHeight(.94f).imePadding(),shape=RoundedCornerShape(12.dp),color=White) {
    Column {
-    Row(Modifier.fillMaxWidth().padding(horizontal=24.dp),verticalAlignment=Alignment.CenterVertically){
-     Text("기억과 평가 수정",fontSize=25.sp,fontWeight=FontWeight.Bold,color=Ink,modifier=Modifier.weight(1f))
-     TextButton(onClick={editId=null},modifier=Modifier.heightIn(min=76.dp)){Text("닫기",fontSize=20.sp)}
+    Row(Modifier.fillMaxWidth().padding(horizontal=24.dp),verticalAlignment=Alignment.CenterVertically) {
+     Text(if(editing)"기억과 평가 수정" else "이번 여행은 어땠나요?",fontSize=26.sp,fontWeight=FontWeight.Bold,color=Ink,modifier=Modifier.weight(1f))
+     TextButton(onClick=onCancel,modifier=Modifier.heightIn(min=76.dp)){Text("닫기",fontSize=20.sp)}
     }
     HorizontalDivider(color=Line)
-    Column(Modifier.weight(1f,false).verticalScroll(rememberScrollState()).padding(24.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
-     ChoiceRow("만족도",listOf("1","2","3","4","5"),editRating.toString()){editRating=it.toInt()}
-     MemoryDetailsEditor(editDate,editFeelings,{editDate=it},{editFeelings=it})
-     OutlinedTextField(value=editNote,onValueChange={editNote=it.take(280)},label={Text("기억 메모 · 280자 이내")},textStyle=androidx.compose.ui.text.TextStyle(fontSize=20.sp,lineHeight=30.sp),modifier=Modifier.fillMaxWidth())
-     if(saveError)Text("수정하지 못했어요. 입력과 주차 상태를 확인하세요.",color=Coral)
-     FlowRow(horizontalArrangement=Arrangement.spacedBy(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-      PrimaryButton("수정 저장",{if(onEdit(editId!!,editRating,editNote,editDate.ifBlank{null},editFeelings))editId=null else saveError=true},enabled=validMemoryDate(editDate))
-      SecondaryButton("변경 취소",{editId=null})
+    Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(24.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
+     if(editing) {
+      Text(Catalog.routes.first{it.id==draft.routeId}.title,fontSize=23.sp,fontWeight=FontWeight.Bold,color=Ink)
+      Text("${draft.kind!!.label} · 기존 코스와 기록 종류는 유지됩니다.",color=Muted)
+     } else {
+      Text("1. 어떤 코스를 기록하나요?",fontSize=21.sp,fontWeight=FontWeight.Bold,color=Ink)
+      currentTrip?.let { trip -> Catalog.routes.firstOrNull{it.id==trip.routeId}?.let { route ->
+       Text("진행 중인 ${if(trip.mode==Mode.SIMULATOR)"SIM " else ""}코스: ${route.title}\n아래에서 기록할 코스를 직접 선택하세요.",fontSize=17.sp,color=Muted)
+      } }
+      FlowRow(horizontalArrangement=Arrangement.spacedBy(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+       Catalog.routes.forEach { route ->
+        FilterChip(selected=draft.routeId==route.id,onClick={draft=draft.copy(routeId=route.id)},label={Text(route.title,fontSize=18.sp)},modifier=Modifier.heightIn(min=76.dp),shape=RoundedCornerShape(12.dp),colors=FilterChipDefaults.filterChipColors(selectedContainerColor=AtlasSoft,selectedLabelColor=AtlasGreen))
+       }
+      }
+      Text("2. 실제 여행인가요, SIM·시연인가요?",fontSize=21.sp,fontWeight=FontWeight.Bold,color=Ink)
+      FlowRow(horizontalArrangement=Arrangement.spacedBy(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+       FamilyMemoryKind.entries.forEach { kind ->
+        FilterChip(selected=draft.kind==kind,onClick={draft=draft.copy(kind=kind)},label={Text(kind.label,fontSize=19.sp)},modifier=Modifier.heightIn(min=76.dp),shape=RoundedCornerShape(12.dp),colors=FilterChipDefaults.filterChipColors(selectedContainerColor=AtlasSoft,selectedLabelColor=AtlasGreen))
+       }
+      }
+     }
+     Text(if(editing)"만족도를 다시 선택할 수 있어요" else "3. 이 코스에 얼마나 만족했나요?",fontSize=21.sp,fontWeight=FontWeight.Bold,color=Ink)
+     MemoryRatingChoices(draft.rating){draft=draft.copy(rating=it)}
+     Text(when(draft.kind) {
+      FamilyMemoryKind.ACTUAL -> "실제 여행 평점은 ‘가족 비교’의 코스 정렬에 반영됩니다."
+      FamilyMemoryKind.SIM -> "SIM·시연 평점은 ‘가족 비교’에 반영하지 않습니다."
+      null -> "실제 여행 평점만 ‘가족 비교’에 반영합니다. 기록 종류도 선택해 주세요."
+     },fontSize=17.sp,color=Muted)
+     HorizontalDivider(color=Line)
+     TextButton(onClick={detailsOpen=!detailsOpen},modifier=Modifier.fillMaxWidth().heightIn(min=76.dp)) {
+      Text(if(detailsOpen)"날짜·메모·느낌 접기" else "날짜·메모·느낌 추가 (선택)"+if(draft.tripDate.isNotBlank()||draft.note.isNotBlank()||draft.feelingTags.isNotEmpty())" · 내용 있음" else "",fontSize=19.sp)
+     }
+     if(detailsOpen) {
+      MemoryDetailsEditor(draft.tripDate,draft.feelingTags,{draft=draft.copy(tripDate=it)},{draft=draft.copy(feelingTags=it)})
+      OutlinedTextField(value=draft.note,onValueChange={draft=draft.copy(note=it.take(280))},label={Text("기억하고 싶은 점 (선택, 280자)")},textStyle=androidx.compose.ui.text.TextStyle(fontSize=20.sp,lineHeight=30.sp),modifier=Modifier.fillMaxWidth(),minLines=2)
+     }
+    }
+    HorizontalDivider(color=Line)
+    Column(Modifier.fillMaxWidth().padding(horizontal=24.dp,vertical=16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
+     if(saveError)Text("저장하지 못했어요. 입력과 주차 상태를 확인하세요. 입력한 내용은 유지됩니다.",color=Coral,fontSize=17.sp)
+     else if(!draft.requiredChoicesComplete)Text("코스, 기록 종류, 만족도를 모두 선택하면 저장할 수 있어요.",color=Muted,fontSize=17.sp)
+     else if(!draft.detailsValid)Text("날짜·메모·느낌을 펼쳐 입력을 확인해 주세요.",color=Coral,fontSize=17.sp)
+     else if(!editing&&memoryCount>=500)Text("기억 500개 한도에 도달해 새 기억을 저장할 수 없어요.",color=Coral,fontSize=17.sp)
+     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(16.dp)) {
+      SecondaryButton(if(editing)"변경 취소" else "취소",onCancel,Modifier.weight(.35f))
+      PrimaryButton(if(editing)"수정 저장" else "기억 저장",{if(draft.canSave(memoryCount,editing))saveError=!onSave(draft)},Modifier.weight(.65f),enabled=draft.canSave(memoryCount,editing))
      }
     }
    }
   }
  }
- if(deleteId!=null) AlertDialog(onDismissRequest={deleteId=null},title={Text("이 기억을 삭제할까요?")},text={Text("이 앱에 저장한 메모와 평점을 삭제합니다. 삭제한 기억은 복구할 수 없습니다. 다른 여행 기록과 우표는 유지됩니다.")},confirmButton={TextButton(modifier=Modifier.heightIn(min=76.dp),onClick={if(onDelete(deleteId!!))deleteId=null}){Text("기억 삭제 확인")}},dismissButton={TextButton(modifier=Modifier.heightIn(min=76.dp),onClick={deleteId=null}){Text("취소")}})
-
- }
 }
 
-private fun validMemoryDate(value:String):Boolean = value.isBlank() || try { java.time.LocalDate.parse(value).toString()==value } catch(_:Exception){false}
+@OptIn(ExperimentalLayoutApi::class)
+@Composable private fun MemoryRatingChoices(rating:Int?,onSelect:(Int)->Unit) {
+ FlowRow(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(10.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
+  (1..5).forEach { value ->
+   val active=rating==value
+   val interaction=remember(value){MutableInteractionSource()}
+   val focused by interaction.collectIsFocusedAsState()
+   Surface(onClick={onSelect(value)},interactionSource=interaction,color=if(active)AtlasSoft else White,shape=RoundedCornerShape(12.dp),border=BorderStroke(if(focused)3.dp else 1.dp,if(active||focused)AtlasGreen else Line),modifier=Modifier.widthIn(min=150.dp).heightIn(min=90.dp).semantics{selected=active;role=Role.RadioButton}) {
+    Column(Modifier.padding(horizontal=18.dp,vertical=12.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
+     Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+      Text("${value}점",fontSize=24.sp,fontWeight=FontWeight.Bold,color=Ink)
+      TripSelectionMark(active)
+     }
+     Text(familyRatingMeaning(value),fontSize=17.sp,color=if(active)AtlasGreen else Muted)
+    }
+   }
+  }
+ }
+}
 @OptIn(ExperimentalLayoutApi::class)
 @Composable private fun MemoryDetailsEditor(date:String,feelings:List<String>,onDate:(String)->Unit,onFeelings:(List<String>)->Unit) {
  OutlinedTextField(value=date,onValueChange={onDate(it.take(10))},label={Text("여행 날짜 · YYYY-MM-DD (선택)")},isError=!validMemoryDate(date),singleLine=true,textStyle=androidx.compose.ui.text.TextStyle(fontSize=20.sp),modifier=Modifier.fillMaxWidth().heightIn(min=76.dp))
  if(!validMemoryDate(date))Text("예: 2026-11-11 · 실제 달력 날짜로 입력하세요.",color=Coral)
- Text("그날의 느낌 · 직접 선택, 추천 점수에는 미반영",fontSize=17.sp,color=Muted)
+ Text("그날의 느낌 · 직접 선택, 가족 비교 점수에는 미반영",fontSize=17.sp,color=Muted)
  FlowRow(horizontalArrangement=Arrangement.spacedBy(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
   FamilyFeelings.all.forEach { feeling ->
    FilterChip(selected=feeling in feelings,onClick={onFeelings(if(feeling in feelings)feelings-feeling else feelings+feeling)},label={Text(feeling,fontSize=18.sp)},modifier=Modifier.heightIn(min=76.dp))

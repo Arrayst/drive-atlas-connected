@@ -51,15 +51,16 @@ import kotlin.math.roundToInt
  val road = remember(route.id) { readRoad(context, route.id) }
  val selectedRestIds = remember(route.id) { FamilyStore(context).loadFamily().plans[route.id]?.effectiveRestFacilityIds.orEmpty().toSet() }
  val places = remember(route.id, selectedRestIds) { mapPlaces(route, selectedRestIds) }
- val consent = remember { VectorMapConsentState() }
+ val consent = rememberVectorMapConsentState()
  var filter by remember(route.id) { mutableStateOf<MapPlaceKind?>(null) }
  var selected by remember(route.id) { mutableStateOf<MapPlace?>(null) }
  var listPlaces by remember(route.id) { mutableStateOf<List<MapPlace>?>(null) }
  var offlineDemo by remember(route.id) { mutableStateOf(false) }
  var attributionOpen by remember { mutableStateOf(false) }
+ var connectionOpen by remember { mutableStateOf(false) }
  val shown = remember(places, filter) { visibleMapPlaces(places, filter) }
  val latestControls by rememberUpdatedState(controlsEnabled)
- LaunchedEffect(controlsEnabled) { if (!controlsEnabled) { selected = null; listPlaces = null; attributionOpen = false } }
+ LaunchedEffect(controlsEnabled) { if (!controlsEnabled) { selected = null; listPlaces = null; attributionOpen = false; connectionOpen = false } }
  Column(modifier.clipToBounds().background(White)) {
   Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
    Column(Modifier.weight(1f)) {
@@ -105,9 +106,11 @@ import kotlin.math.roundToInt
   text = { Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
    Text("실제 공개 지도와 대표 좌표입니다. 도로 기준점은 주차·정차 가능 지점이 아닙니다. n곳 표시는 가까운 장소 묶음이며, 배지는 그중 한 장소의 실제 대표 좌표에 놓입니다.", fontSize = 16.sp)
    Text("OSRM 참고 경로 · 실시간 교통 미반영 · 인터넷 연결 필요", fontSize = 15.sp)
+   TextButton(onClick = { if (latestControls) { attributionOpen = false; connectionOpen = true } }, enabled = controlsEnabled, modifier = Modifier.heightIn(min = 64.dp)) { Text("지도 연결 동의 관리", fontSize = 16.sp) }
    for ((name, url) in listOf("OpenFreeMap · 이용약관" to NavigationVectorStyle.terms, "© OpenMapTiles" to "https://www.openmaptiles.org/", "© OpenStreetMap contributors" to "https://www.openstreetmap.org/copyright"))
     TextButton(onClick = { if (latestControls) openWeb(context, url) }, enabled = controlsEnabled, modifier = Modifier.heightIn(min = 64.dp)) { Text(name, fontSize = 16.sp) }
   } }, confirmButton = { TextButton(onClick = { attributionOpen = false }, modifier = Modifier.heightIn(min = 64.dp)) { Text("닫기") } })
+ if (connectionOpen) VectorMapConsentDialog(consent, controlsEnabled, onDismiss = { connectionOpen = false })
 }
 
 @Composable private fun ConnectedCourseExplorer(

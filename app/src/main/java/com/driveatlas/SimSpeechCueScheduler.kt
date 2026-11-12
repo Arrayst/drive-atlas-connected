@@ -2,6 +2,7 @@ package com.driveatlas
 
 /** No timers or platform side effects. Caller supplies monotonic time and ordered replay progress. */
 internal data class SimSpeechDecision(val cancel:Boolean=false,val text:String?=null)
+internal const val SimSpeechPlaybackTimeoutMillis = 12_000L
 internal class SimSpeechCueScheduler {
  private var activeStep:Int?=null
  private var issuedAt:Long?=null
@@ -11,7 +12,8 @@ internal class SimSpeechCueScheduler {
  fun tick(step:Int,distance:Double,instruction:String,now:Long,busy:Boolean,allowed:Boolean,startedAtMillis:Long?=null):SimSpeechDecision {
   if(!allowed||step<0||!distance.isFinite()||distance<0||now<0){val cancel=activeStep!=null;reset();return SimSpeechDecision(cancel)}
   val age=issuedAt?.let{now-it}?:0L
-  val cancel=activeStep!=null&&(activeStep!=step||(if(startedAtMillis!=null)now-startedAtMillis>=6000 else age>=15000)||age<0)
+  // Allow a valid local utterance beyond six seconds, but never a stale step or an unbounded request.
+  val cancel=activeStep!=null&&(activeStep!=step||(if(startedAtMillis!=null)now-startedAtMillis>=SimSpeechPlaybackTimeoutMillis else age>=15000)||age<0)
   if(cancel){activeStep=null;issuedAt=null}
   if(busy&&!cancel)return SimSpeechDecision()
   // Opt-in speech slows replay to 10 m/s. Never queue a backlog of turns.

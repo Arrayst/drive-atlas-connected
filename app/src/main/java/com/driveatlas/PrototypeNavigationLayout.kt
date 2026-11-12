@@ -25,6 +25,8 @@ import java.util.Locale
  result:NavPrototypeRoute?,replay:NavReplayState,simulatedOffset:Point?,
  busy:Boolean,active:Boolean,canRun:Boolean,validRequest:Boolean,
  autoSpeech:Boolean,canContinuous:Boolean,error:String,speechStatus:String,hasTrip:Boolean,
+ waitingForStart:Boolean,mapReadiness:NavigationMapReadiness,mapConsent:VectorMapConsentState,
+ onMapReadiness:(NavPrototypeRoute?,NavigationMapReadiness)->Unit,onMapConsent:()->Unit,onCancelStart:()->Unit,
  onBack:()->Unit,onPage:(String)->Unit,onDebug:()->Unit,
  onDeparture:(String)->Unit,onCourse:(String)->Unit,onCalculate:()->Unit,
  onToggleReplay:()->Unit,onToggleSpeech:()->Unit,onOneShot:()->Unit,
@@ -36,7 +38,7 @@ import java.util.Locale
  val settingsAnchor=remember{BringIntoViewRequester()}
  val drawer=rememberDrawerState(DrawerValue.Closed)
  val scope=rememberCoroutineScope()
- val canBrowse=canBrowseNavigation(canRun,active,replay.running)
+ val canBrowse=canBrowseNavigation(canRun,active,replay.running)&&!waitingForStart
  val latestCanBrowse by rememberUpdatedState(canBrowse)
  fun closeDrawer(){scope.launch{drawer.close()}}
  fun openDrawer(){if(latestCanBrowse)scope.launch{if(latestCanBrowse){drawerScroll.scrollTo(0);drawer.open()}}}
@@ -82,7 +84,7 @@ import java.util.Locale
      }
      Text("선택 쉼터 ${plan.effectiveRestFacilityIds.size}곳 · 가족 비교에서 저장한 순서 반영 · 집 주소/GPS는 사용하지 않음",fontSize=16.sp,color=Muted)
      Button(shape=RoundedCornerShape(16.dp),onClick={parkedAction(onCalculate)},enabled=canBrowse&&!busy&&validRequest,modifier=Modifier.fillMaxWidth().heightIn(min=72.dp)) {
-      Text(if(busy)"전체 경로를 계산하는 중…" else "전체 왕복 경로 계산",fontSize=20.sp)
+      Text(if(busy)"전체 경로를 계산하는 중…" else "길찾기 시작 · SIM 안내",fontSize=20.sp)
      }
      if(!validRequest)Text("저장된 휴식 계획 좌표·순서가 유효하지 않습니다. 가족 비교에서 확인하세요.",fontSize=17.sp,color=Ink)
      if(error.isNotEmpty())Text(error,fontSize=16.sp,color=Ink)
@@ -101,9 +103,10 @@ import java.util.Locale
      }
      }
      HorizontalDivider()
+     TextButton(shape=RoundedCornerShape(16.dp),onClick={parkedAction(onMapConsent)},enabled=canBrowse,modifier=Modifier.fillMaxWidth().heightIn(min=64.dp)){Text("지도 연결 동의 관리",fontSize=20.sp)}
      Text("시연·출처 안내",fontSize=22.sp,fontWeight=FontWeight.Bold)
-     Text("주차·에뮬레이터 전용 / SIM 연속 음성은 직접 켜기 · 실시간 교통·자동 이탈 재탐색 미지원",fontSize=16.sp,color=Muted)
-     Text("가상 위치 재생을 시작한 뒤 음성을 켜세요. 정지·화면 이탈 시 꺼집니다. 음성 ON은 10m/s, OFF는 100m/s 모의 재생입니다. 촘촘한 지시는 생략될 수 있으며 실제 운전에 사용할 수 없습니다.",fontSize=16.sp,color=Muted)
+     Text("주차·에뮬레이터 전용 / 시작 시 SIM·기기 내 음성 선택 · 실시간 교통·자동 이탈 재탐색 미지원",fontSize=16.sp,color=Muted)
+     Text("길찾기 시작에서 SIM·음성 안내를 함께 시작할 수 있어요. 정지·화면 이탈 시 음성은 꺼지고 수동 재개해도 다시 켜지지 않습니다. 음성 ON은 10m/s, OFF는 100m/s 모의 재생입니다. 촘촘한 지시는 생략될 수 있으며 실제 운전에 사용할 수 없습니다.",fontSize=16.sp,color=Muted)
      Text("지점 좌표는 차량 진입구로 검증되지 않았습니다. 개발용 OSRM 공개 서버와 OSM 지도: 연결 필요·가동 보장 없음. 공개 기준점 시연이며 실제 운전에 사용하지 마세요.",fontSize=16.sp,color=Muted)
      Text("실제 장소·지도 · 방문/주행은 모의 체험 · 운전 중 조작 금지",fontSize=16.sp,color=Muted)
     }
@@ -115,14 +118,15 @@ import java.util.Locale
    val cardWidth=navigationInstructionWidth(maxWidth.value).dp
    val view=result?.snapshot(replay)
    CourseVectorNavigationMap(route,result,simulatedOffset?:view?.position,Modifier.fillMaxSize(),
-    replayDistance=if(replay.offRoute)null else replay.distanceMeters,showStatusLabel=false,controlsEnabled=canBrowse)
+    replayDistance=if(replay.offRoute)null else replay.distanceMeters,showStatusLabel=false,controlsEnabled=canBrowse,
+    consent=mapConsent,onRequestConsent=onMapConsent,onMapReadiness=onMapReadiness)
    Surface(Modifier.align(Alignment.TopStart).padding(16.dp),color=White,shape=RoundedCornerShape(16.dp),shadowElevation=4.dp) {
     TextButton(shape=RoundedCornerShape(16.dp),onClick=::openDrawer,enabled=canBrowse,modifier=Modifier.size(72.dp)){Text("메뉴",fontSize=20.sp,fontWeight=FontWeight.Bold)}
    }
    Surface(Modifier.align(Alignment.TopStart).padding(start=104.dp,top=16.dp).width(cardWidth),
     color=White,shape=RoundedCornerShape(16.dp),shadowElevation=4.dp) {
     Column(Modifier.padding(if(wide)20.dp else 14.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
-     Text("SIM · ${if(replay.running)"위치 재생 중" else if(view?.finished==true)"재생 완료" else if(replay.offRoute)"이탈 시연 · 정지" else "재생 전·일시정지"}",fontSize=16.sp,color=AtlasGreen,fontWeight=FontWeight.Bold)
+     Text("SIM · ${if(waitingForStart)"시작 준비 중" else if(replay.running&&mapReadiness!=NavigationMapReadiness.READY)"지도 로딩 · 위치 대기" else if(replay.running)"위치 재생 중" else if(view?.finished==true)"재생 완료" else if(replay.offRoute)"이탈 시연 · 정지" else "재생 전·일시정지"}",fontSize=16.sp,color=AtlasGreen,fontWeight=FontWeight.Bold)
      if(view!=null) {
       Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
        NavigationManeuverSymbol(view.maneuver,Modifier.size(if(wide)56.dp else 40.dp))
@@ -132,29 +136,37 @@ import java.util.Locale
       Text(String.format(Locale.KOREA,"남은 도로 %.1f km · 전체 %.1f km",view.remainingMeters/1000,result.meters/1000),fontSize=16.sp,color=Muted)
      } else {
       Text(route.title,fontSize=22.sp,fontWeight=FontWeight.Bold,color=Ink)
-      Text("기본 코스 지도 · 메뉴에서 왕복 경로를 계산하세요.",fontSize=16.sp,color=Muted)
+      Text("공개 기준점 왕복 · 길찾기 시작을 누르면 SIM 안내가 시작돼요.",fontSize=16.sp,color=Muted)
      }
     }
    }
    Surface(Modifier.align(Alignment.BottomStart).padding(start=16.dp,end=16.dp,bottom=64.dp).widthIn(max=680.dp),
     color=White,shape=RoundedCornerShape(16.dp),shadowElevation=4.dp) {
     Column(Modifier.padding(12.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
-     if(view==null) {
-      Button(shape=RoundedCornerShape(16.dp),onClick=::openSettings,enabled=canBrowse,modifier=Modifier.heightIn(min=64.dp)){Text(if(busy)"경로 계산 중…" else "경로 설정",fontSize=20.sp)}
+     if(waitingForStart) {
+      Text(if(busy)"전체 왕복 경로 계산 중…" else "도로 지도 준비 중 · 준비되면 SIM 안내 시작",fontSize=18.sp,color=Ink)
+      OutlinedButton(shape=RoundedCornerShape(16.dp),onClick=onCancelStart,enabled=active&&canRun,modifier=Modifier.heightIn(min=64.dp)){Text("시작 취소",fontSize=20.sp)}
+     } else if(view==null) {
+      Text("${DepartureReferences.all.firstOrNull{it.id==departureId}?.label} → ${route.title} → 귀가 · 쉼터 ${plan.effectiveRestFacilityIds.size}곳",fontSize=16.sp,color=Ink,maxLines=2,overflow=TextOverflow.Ellipsis)
+      FlowRow(horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+       Button(shape=RoundedCornerShape(16.dp),onClick={parkedAction(onCalculate)},enabled=canBrowse&&!busy&&validRequest,modifier=Modifier.heightIn(min=64.dp)){Text("길찾기 시작 · SIM",fontSize=20.sp)}
+       OutlinedButton(shape=RoundedCornerShape(16.dp),onClick=::openSettings,enabled=canBrowse,modifier=Modifier.heightIn(min=64.dp)){Text("경로 설정",fontSize=20.sp)}
+      }
      } else FlowRow(horizontalArrangement=Arrangement.spacedBy(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-      Button(shape=RoundedCornerShape(16.dp),onClick={if(active&&canRun)onToggleReplay()},enabled=active&&canRun&&!replay.offRoute&&!view.finished,modifier=Modifier.heightIn(min=64.dp)){Text(if(replay.running)"일시정지" else "위치 재생",fontSize=20.sp)}
-      OutlinedButton(shape=RoundedCornerShape(16.dp),onClick={if(active&&canRun)onToggleSpeech()},enabled=active&&canRun&&replay.running&&!replay.offRoute&&canContinuous,modifier=Modifier.heightIn(min=64.dp)){Text(if(autoSpeech)"음성 끄기" else "음성 켜기",fontSize=20.sp)}
+      Button(shape=RoundedCornerShape(16.dp),onClick={if(active&&canRun)onToggleReplay()},enabled=active&&canRun&&!replay.offRoute&&!view.finished&&(replay.running||mapReadiness==NavigationMapReadiness.READY),modifier=Modifier.heightIn(min=64.dp)){Text(if(replay.running)"일시정지" else "SIM 재개",fontSize=20.sp)}
+      OutlinedButton(shape=RoundedCornerShape(16.dp),onClick={if(active&&canRun)onToggleSpeech()},enabled=active&&canRun&&replay.running&&!replay.offRoute&&canContinuous&&mapReadiness==NavigationMapReadiness.READY,modifier=Modifier.heightIn(min=64.dp)){Text(if(autoSpeech)"음성 끄기" else "음성 켜기",fontSize=20.sp)}
      }
-     Text(if(view==null)"SIM · 실제 차량 길안내 아님" else speechStatus,fontSize=15.sp,color=Muted,maxLines=2,overflow=TextOverflow.Ellipsis)
+     Text(if(view==null)"SIM · 실제 차량 주행 아님 · 시작할 때 기기 내 음성 선택" else speechStatus,fontSize=15.sp,color=Muted,maxLines=2,overflow=TextOverflow.Ellipsis)
      if(view!=null)Text("SIM · 실제 길안내 아님 · ${if(autoSpeech)10 else 100}m/s 모의 재생",fontSize=14.sp,color=Muted)
-     if(error.isNotEmpty()&&(result==null||replay.offRoute))Text(error,fontSize=15.sp,color=Ink,maxLines=3,overflow=TextOverflow.Ellipsis)
+     if(error.isNotEmpty())Text(error,fontSize=15.sp,color=Ink,maxLines=3,overflow=TextOverflow.Ellipsis)
     }
    }
   }
  }
  // Registered after the drawer: system Back closes it without altering the route.
  BackHandler {
-  if(shouldDismissDrawerOnBack(drawer.isOpen))closeDrawer()
+  if(waitingForStart){onCancelStart();closeDrawer()}
+  else if(shouldDismissDrawerOnBack(drawer.isOpen))closeDrawer()
   else if(replay.running){if(active&&canRun)onToggleReplay()}
   else if(canBrowse)onBack()
  }

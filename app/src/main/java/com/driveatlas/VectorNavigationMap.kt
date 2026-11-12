@@ -35,10 +35,12 @@ import org.maplibre.geojson.FeatureCollection
 import org.maplibre.geojson.LineString
 import org.maplibre.geojson.Point as GeoPoint
 
-/** One composition for both preview and replay retains session consent, never device GPS. */
+/** Public-map consent is shared with course exploration; no device GPS is used. */
 @Composable internal fun CourseVectorNavigationMap(
  course: Route, route: NavPrototypeRoute?, position: Point?, modifier: Modifier = Modifier,
  replayDistance: Double? = null, showStatusLabel: Boolean = false, controlsEnabled: Boolean = true,
+ consent: VectorMapConsentState? = null, onRequestConsent: (() -> Unit)? = null,
+ onMapReadiness: (NavPrototypeRoute?, NavigationMapReadiness) -> Unit = { _, _ -> },
 ) {
  val context = LocalContext.current
  val road = remember(course.id) { readRoad(context, course.id) }
@@ -47,16 +49,19 @@ import org.maplibre.geojson.Point as GeoPoint
    NavigationReferenceMarker("course-$i", stop.name, "${i + 1}", NavigationMarkerKind.COURSE, stop.point)
   }
  }
- VectorNavigationMap(route?.geometry ?: road.points, route, position, references, modifier, replayDistance, showStatusLabel, controlsEnabled)
+ VectorNavigationMap(route?.geometry ?: road.points, route, position, references, modifier, replayDistance, showStatusLabel, controlsEnabled, consent ?: rememberVectorMapConsentState(), onRequestConsent, onMapReadiness)
 }
 
 @Composable private fun VectorNavigationMap(
  points: List<Point>, route: NavPrototypeRoute?, position: Point?, references: List<NavigationReferenceMarker>,
  modifier: Modifier, replayDistance: Double?, showStatusLabel: Boolean, controlsEnabled: Boolean,
+ consent: VectorMapConsentState, onRequestConsent: (() -> Unit)?, onMapReadiness: (NavPrototypeRoute?, NavigationMapReadiness) -> Unit,
 ) {
- val consent = remember { VectorMapConsentState() }
- VectorMapConnectionGate(VectorMapPurpose.SIM_REPLAY, consent, modifier, controlsEnabled) {
-  ConnectedVectorNavigationMap(points, route, position, references, Modifier.fillMaxSize(), replayDistance, showStatusLabel, controlsEnabled)
+ val latestReadiness by rememberUpdatedState(onMapReadiness)
+ LaunchedEffect(consent.granted, route) { if (!consent.granted) latestReadiness(route, NavigationMapReadiness.DISCONNECTED) }
+ VectorMapConnectionGate(VectorMapPurpose.SIM_REPLAY, consent, modifier, controlsEnabled, onRequestConsent) {
+  // A new route needs a fresh viewport/frame, never readiness from the old public course.
+  key(route) { ConnectedVectorNavigationMap(points, route, position, references, Modifier.fillMaxSize(), replayDistance, showStatusLabel, controlsEnabled, onMapReadiness) }
  }
 }
 
@@ -64,6 +69,7 @@ import org.maplibre.geojson.Point as GeoPoint
 @Composable private fun ConnectedVectorNavigationMap(
  points: List<Point>, route: NavPrototypeRoute?, position: Point?, references: List<NavigationReferenceMarker>,
  modifier: Modifier, replayDistance: Double?, showStatusLabel: Boolean, controlsEnabled: Boolean,
+ onMapReadiness: (NavPrototypeRoute?, NavigationMapReadiness) -> Unit,
 ) {
  val context = LocalContext.current
  val density = LocalDensity.current
@@ -75,6 +81,8 @@ import org.maplibre.geojson.Point as GeoPoint
  var roadsVisible by remember(retry) { mutableStateOf(false) }
  var failed by remember(retry) { mutableStateOf(false) }
  var timedOut by remember(retry) { mutableStateOf(false) }
+ var blankRendered by remember(retry) { mutableStateOf(false) }
+ val latestReadiness by rememberUpdatedState(onMapReadiness)
  val latestControls by rememberUpdatedState(controlsEnabled)
  val fraction = remember(route) { Animatable(1f) }
  var start by remember(route) { mutableStateOf(replayDistance ?: 0.0) }
@@ -93,16 +101,17 @@ import org.maplibre.geojson.Point as GeoPoint
   fraction.snapTo(0f); fraction.animateTo(1f, tween(850, easing = LinearEasing))
  }
  LaunchedEffect(controlsEnabled) { if (!controlsEnabled && route != null) follow = true }
- LaunchedEffect(retry) { delay(18_000); timedOut = true }
+ LaunchedEffect(roadsVisible, retry) { timedOut = false; if (!roadsVisible) { delay(18_000); timedOut = true } }
  val mapView = rememberVectorMapView(retry)
  DisposableEffect(mapView) {
   var disposed = false
   val failure = MapView.OnDidFailLoadingMapListener { if (!disposed) { failed = true; roadsVisible = false } }
   val rendered = MapView.OnDidFinishRenderingMapListener { fully ->
-   if (!disposed && mapView.width > 0 && mapView.height > 0) {
+   if (!disposed && style != null && mapView.width > 0 && mapView.height > 0) {
     val actualRoads = map?.queryRenderedFeatures(RectF(0f, 0f, mapView.width.toFloat(), mapView.height.toFloat()), *NavigationVectorStyle.roadLayers).orEmpty()
     // Never retain the previous area's route when the current viewport is blank.
     if (fully || actualRoads.isEmpty()) roadsVisible = actualRoads.isNotEmpty() && !failed
+    blankRendered = fully && actualRoads.isEmpty()
    }
   }
   mapView.addOnDidFailLoadingMapListener(failure)
@@ -120,7 +129,10 @@ import org.maplibre.geojson.Point as GeoPoint
     style = loaded
    } }
   } }
-  onDispose { disposed = true; mapView.removeOnDidFailLoadingMapListener(failure); mapView.removeOnDidFinishRenderingMapListener(rendered) }
+  onDispose { disposed = true; latestReadiness(route, NavigationMapReadiness.DISCONNECTED); mapView.removeOnDidFailLoadingMapListener(failure); mapView.removeOnDidFinishRenderingMapListener(rendered) }
+ }
+ LaunchedEffect(style, roadsVisible, failed, timedOut, blankRendered) {
+  latestReadiness(route, navigationMapReadiness(style != null, roadsVisible, failed, timedOut, blankRendered))
  }
  LaunchedEffect(map, controlsEnabled) { map?.uiSettings?.setAllGesturesEnabled(controlsEnabled) }
  LaunchedEffect(style, references) {
@@ -181,8 +193,8 @@ import org.maplibre.geojson.Point as GeoPoint
   }
   if (!roadsVisible) Surface(Modifier.align(Alignment.Center).padding(32.dp).widthIn(max = 520.dp), color = White, shape = Corner) {
    Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-    Text(if (failed || timedOut) "이 영역의 도로 지도를 확인하지 못했어요. 빈 지도에는 경로·모의 차량을 표시하지 않습니다." else "실제 도로·건물 지도 불러오는 중…", color = Ink, fontSize = 18.sp)
-    if (failed || timedOut) TextButton(onClick = { if (latestControls) retry++ }, enabled = controlsEnabled, modifier = Modifier.heightIn(min = 64.dp)) { Text("다시 불러오기") }
+    Text(if (failed || timedOut || blankRendered) "이 영역의 도로 지도를 확인하지 못했어요. 빈 지도에는 경로·모의 차량을 표시하지 않습니다." else "실제 도로·건물 지도 불러오는 중…", color = Ink, fontSize = 18.sp)
+    if (failed || timedOut || blankRendered) TextButton(onClick = { if (latestControls) retry++ }, enabled = controlsEnabled, modifier = Modifier.heightIn(min = 64.dp)) { Text("다시 불러오기") }
    }
   }
   MapProviderAttribution(controlsEnabled, Modifier.align(Alignment.BottomStart).fillMaxWidth())

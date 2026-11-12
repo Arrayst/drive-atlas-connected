@@ -124,43 +124,74 @@ private class AndroidOfflinePreview(context:Context,val status:(String)->Unit){
  var replay by remember{mutableStateOf(NavReplayState())}
  var simulatedOffset by remember{mutableStateOf<Point?>(null)}
  var busy by remember{mutableStateOf(false)};var consent by remember{mutableStateOf(false)}
- var error by remember{mutableStateOf("")};var speechStatus by remember{mutableStateOf("음성 기본 꺼짐 · SIM 재생 중 연속 안내를 직접 켜세요")}
+ var error by remember{mutableStateOf("")};var speechStatus by remember{mutableStateOf("길찾기 시작에서 SIM·기기 내 음성 안내를 시작할 수 있어요")}
  var active by remember{mutableStateOf(owner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))}
  var generation by remember{mutableIntStateOf(0)}
  var requestJob by remember{mutableStateOf<Job?>(null)}
  var autoSpeech by remember{mutableStateOf(false)}
+ var startWithSpeech by remember{mutableStateOf(true)}
+ var waitingForStart by remember{mutableStateOf(false)}
+ var mapReadiness by remember{mutableStateOf(NavigationMapReadiness.LOADING)}
+ var mapDialog by remember{mutableStateOf(false)}
+ var startAfterMapConsent by remember{mutableStateOf(false)}
+ val mapConsent=rememberVectorMapConsentState()
+ val startGate=remember{SimNavigationStartGate()}
  val cueScheduler=remember{SimSpeechCueScheduler()}
  val speech=remember(context){PrototypeSpeech(context,{speechStatus=it},{autoSpeech=false})}
  fun stopSpeech(){
   val wasEnabled=autoSpeech;autoSpeech=false;cueScheduler.reset();speech.stop()
   if(wasEnabled)speechStatus="SIM 연속 음성 꺼짐 · 다시 켜기 전에는 자동 재개하지 않습니다."
  }
+ fun cancelStart(){
+  generation++;requestJob?.cancel();busy=false;waitingForStart=false;startGate.cancel()
+  consent=false;startAfterMapConsent=false;replay=replay.copy(running=false);stopSpeech()
+ }
  val plan=snapshot.plans[routeId]?:FamilyPlan()
  val request=NavPrototypeRequest(routeId,departureId,plan.effectiveRestFacilityIds,plan.restAfterStopIndex)
- fun reset(){generation++;requestJob?.cancel();busy=false;result=null;simulatedOffset=null;replay=NavReplayState();error="";stopSpeech()}
+ fun reset(){cancelStart();result=null;simulatedOffset=null;replay=NavReplayState();mapReadiness=NavigationMapReadiness.LOADING;error=""}
+ fun startRequested(){
+  if(active&&onCanRun()&&!replay.running&&!busy&&!waitingForStart&&request.valid()){
+   stopSpeech();error=""
+   if(mapConsent.granted)consent=true else {startAfterMapConsent=true;mapDialog=true}
+  }
+ }
+ fun mapChanged(renderedRoute:NavPrototypeRoute?,readiness:NavigationMapReadiness){
+  // Ignore callbacks from a removed viewport, including an earlier identical request.
+  if(renderedRoute==null||!isCurrentNavigationViewport(renderedRoute,result))return
+  mapReadiness=readiness
+  if(readiness==NavigationMapReadiness.FAILED||readiness==NavigationMapReadiness.DISCONNECTED){
+   val wasPendingOrRunning=waitingForStart||replay.running
+   cancelStart()
+   if(wasPendingOrRunning)error="지도 연결을 확인하지 못해 SIM·음성을 중지했어요. 지도 복구 후 직접 다시 시작하세요."
+  }else if(readiness==NavigationMapReadiness.READY){
+   startGate.consume(generation,request,renderedRoute.request,mapConsent.granted,active,onCanRun(),BuildConfig.DEBUG,BuildConfig.SIMULATOR)?.let{ticket->
+    waitingForStart=false;replay=NavReplayState(running=true);simulatedOffset=null;error=""
+    cueScheduler.reset();autoSpeech=ticket.withSpeech&&speech.supportsContinuous
+    speechStatus=if(autoSpeech)"SIM·기기 내 음성 안내 시작 · 실제 차량 주행 아님" else if(ticket.withSpeech)"연속 음성을 사용할 수 없어 SIM 텍스트 안내로 시작했어요." else "SIM 텍스트 안내 시작 · 음성 꺼짐"
+   }
+  }
+ }
  DisposableEffect(owner,speech){
-  val observer=LifecycleEventObserver{_,event->if(event==Lifecycle.Event.ON_PAUSE||event==Lifecycle.Event.ON_STOP){active=false;generation++;requestJob?.cancel();busy=false;consent=false;replay=replay.copy(running=false);stopSpeech()}else if(event==Lifecycle.Event.ON_RESUME)active=true}
+  val observer=LifecycleEventObserver{_,event->if(event==Lifecycle.Event.ON_PAUSE||event==Lifecycle.Event.ON_STOP){active=false;cancelStart();mapDialog=false}else if(event==Lifecycle.Event.ON_RESUME)active=true}
   owner.lifecycle.addObserver(observer)
-  onDispose{generation++;requestJob?.cancel();owner.lifecycle.removeObserver(observer);speech.close()}
+  onDispose{startGate.cancel();generation++;requestJob?.cancel();owner.lifecycle.removeObserver(observer);speech.close()}
  }
  LaunchedEffect(request){reset()}
  LaunchedEffect(replay.running,result,active){
   val r=result
   if(r!=null&&replay.running&&active){
-   while(replay.running&&active&&onCanRun()) {delay(1000);if(active&&onCanRun())replay=r.advance(replay,if(autoSpeech)10.0 else 100.0)}
-   if(!active||!onCanRun()){replay=replay.copy(running=false);stopSpeech()}
+   while(replay.running&&active&&onCanRun()) {delay(1000);if(active&&onCanRun()&&mapReadiness==NavigationMapReadiness.READY)replay=r.advance(replay,if(autoSpeech)10.0 else 100.0)}
+   if(!active||!onCanRun()){cancelStart()}
   }
  }
- // One observer for the lifetime of this speech controller. State-keyed effects could
- // cancel an earlier coroutine whose finally then disabled a newly enabled session.
  val currentCanRun by rememberUpdatedState(onCanRun)
  LaunchedEffect(speech){
   try {
    while(true){
     val route=result
     if(autoSpeech){
-     if(route==null||!active||!replay.running||replay.offRoute||!currentCanRun())stopSpeech()
-     else {
+     if(route==null||!active||!replay.running||replay.offRoute||!currentCanRun()||!mapConsent.granted)stopSpeech()
+     else if(mapReadiness==NavigationMapReadiness.READY){
       val v=route.snapshot(replay)
       val decision=cueScheduler.tick(v.stepIndex,v.metersToInstruction,v.nextInstruction,
        android.os.SystemClock.elapsedRealtime(),speech.isBusy,!v.finished,speech.startedAtMillis)
@@ -176,36 +207,61 @@ private class AndroidOfflinePreview(context:Context,val status:(String)->Unit){
   route=Catalog.routes.first{it.id==routeId},entry=entry,plan=plan,departureId=departureId,
   result=result,replay=replay,simulatedOffset=simulatedOffset,busy=busy,active=active,
   canRun=onCanRun(),validRequest=request.valid(),autoSpeech=autoSpeech,canContinuous=speech.supportsContinuous,
-  error=error,speechStatus=speechStatus,hasTrip=hasTrip,onBack=onBack,onPage=onPage,onDebug=onDebug,
-  onDeparture={if(active&&onCanRun()&&!replay.running&&!busy)departureId=it},onCourse={if(active&&onCanRun()&&!replay.running&&!busy)routeId=it},
-  onCalculate={if(active&&onCanRun()&&!replay.running){stopSpeech();consent=true}},
-  onToggleReplay={if(active&&onCanRun()){stopSpeech();replay=replay.copy(running=!replay.running)}},
+  error=error,speechStatus=speechStatus,hasTrip=hasTrip,
+  waitingForStart=waitingForStart,mapReadiness=mapReadiness,mapConsent=mapConsent,
+  onMapReadiness=::mapChanged,onMapConsent={if(active&&onCanRun()&&!replay.running&&!waitingForStart){startAfterMapConsent=false;mapDialog=true}},
+  onCancelStart={cancelStart();error="시작을 취소했어요. 자동 재개하지 않습니다."},
+  onBack={cancelStart();onBack()},onPage={cancelStart();onPage(it)},onDebug={cancelStart();onDebug()},
+  onDeparture={if(active&&onCanRun()&&!replay.running&&!busy&&!waitingForStart)departureId=it},onCourse={if(active&&onCanRun()&&!replay.running&&!busy&&!waitingForStart)routeId=it},
+  onCalculate=::startRequested,
+  onToggleReplay={
+   if(active&&onCanRun()){
+    if(replay.running)cancelStart()
+    else if(!waitingForStart&&mapConsent.granted&&mapReadiness==NavigationMapReadiness.READY)result?.let{r->
+     if(!replay.offRoute&&!r.snapshot(replay).finished){stopSpeech();replay=replay.copy(running=true);error="";speechStatus="SIM 재개 · 음성 꺼짐. 필요하면 음성을 직접 켜세요."}
+    }
+   }
+  },
   onToggleSpeech={
-   if(autoSpeech)stopSpeech() else if(active&&onCanRun()&&replay.running&&speech.supportsContinuous){
+   if(autoSpeech)stopSpeech() else if(active&&onCanRun()&&replay.running&&speech.supportsContinuous&&mapReadiness==NavigationMapReadiness.READY){
     speech.stop();cueScheduler.reset();autoSpeech=true;speechStatus="SIM 연속 음성 켜짐 · 기기 내 합성만 사용"
    }
   },
-  onOneShot={if(active&&onCanRun()&&!replay.running)result?.let{speech.speak(it.snapshot(replay).nextInstruction)}},
-  onReset={if(active&&onCanRun()&&!replay.running){stopSpeech();error="";simulatedOffset=null;replay=NavReplayState()}},
+  onOneShot={if(active&&onCanRun()&&!replay.running&&!waitingForStart)result?.let{speech.speak(it.snapshot(replay).nextInstruction)}},
+  onReset={if(active&&onCanRun()&&!replay.running&&!waitingForStart){cancelStart();error="";simulatedOffset=null;replay=NavReplayState()}},
   onOffRoute={
-   if(active&&onCanRun()&&!replay.running)result?.let { r ->
-    stopSpeech();val view=r.snapshot(replay);val offset=Point(view.position.lat+.02,view.position.lon+.02)
+   if(active&&onCanRun()&&!replay.running&&!waitingForStart)result?.let { r ->
+    cancelStart();val view=r.snapshot(replay);val offset=Point(view.position.lat+.02,view.position.lon+.02)
     val deviation=r.offRouteDistance(offset,replay);simulatedOffset=offset
     replay=replay.copy(running=false,offRoute=deviation>100)
     error="공개 경로의 가상 위치를 이동한 탐지 시연: 경로와 약 ${deviation.toInt()}m 차이. 자동 재탐색은 미지원입니다. 처음부터 재생하거나 전체 경로를 다시 요청하세요."
    }
   },
-  onClear={if(active&&onCanRun()&&!replay.running){stopSpeech();error="";simulatedOffset=null;replay=NavReplayState();result=null}}
+  onClear={if(active&&onCanRun()&&!replay.running&&!waitingForStart){reset()}}
  )
- if(consent&&request.valid())AlertDialog(onDismissRequest={consent=false},title={Text("공개 좌표로 시연 경로를 요청할까요?")},text={Column(Modifier.heightIn(max=400.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(10.dp)){
+ if(mapDialog)VectorMapConsentDialog(mapConsent,active&&onCanRun(),
+  onDismiss={mapDialog=false;startAfterMapConsent=false},
+  onAccepted={mapDialog=false;val continueStart=startAfterMapConsent;startAfterMapConsent=false;if(continueStart&&active&&onCanRun())consent=true},
+  onWithdrawn={cancelStart();mapReadiness=NavigationMapReadiness.DISCONNECTED;error="지도 연결 동의를 철회했어요. 다시 연결하기 전에는 지도를 요청하지 않습니다."})
+ if(consent&&request.valid())AlertDialog(onDismissRequest={cancelStart()},title={Text("공개 좌표로 SIM 길찾기를 시작할까요?")},text={Column(Modifier.heightIn(max=400.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(10.dp)){
   Text("받는 곳: router.project-osrm.org OSRM 공개 서버. 요청은 서버에 기록될 수 있습니다. 실제 집 주소·현재 GPS·가족 메모는 보내지 않습니다.")
   Text("출발·귀가: ${request.departure()?.label}\n코스: ${Catalog.routes.first{it.id==routeId}.title}\n선택 쉼터: ${request.selectedRestIds.joinToString{RestFacilities.find(it,routeId)?.name?:it}.ifEmpty{"없음"}}")
   Text("전송 좌표: "+request.points().joinToString(" → "){String.format(Locale.US,"%.5f, %.5f",it.lat,it.lon)})
-  Text("대표점은 차량 진입구·당일 운영으로 검증되지 않았습니다. 결과는 실제 주행에 사용하지 않는 에뮬레이터 시연 전용입니다.")
+  Text("동의하면 이번 경로를 계산하고 도로 지도가 준비된 뒤 SIM 위치 재생·안내를 바로 시작합니다. 대표점은 차량 진입구·당일 운영으로 검증되지 않았으며 실제 주행에 사용할 수 없습니다.")
+  if(speech.supportsContinuous)Row(verticalAlignment=androidx.compose.ui.Alignment.CenterVertically){
+   Checkbox(checked=startWithSpeech,onCheckedChange={startWithSpeech=it},modifier=Modifier.size(64.dp));Text("기기 내 SIM 음성 안내도 시작 · 클라우드 음성 없음")
+  }else Text("이 환경에서는 SIM 텍스트 안내만 시작합니다. 사용 가능한 연속 음성 서비스가 없습니다.")
+  Text("이번 좌표 전송 동의는 저장하지 않습니다. 일시정지·백그라운드에서는 재생과 음성을 끄며 자동 재개하지 않습니다.")
  }},confirmButton={TextButton(onClick={
   consent=false
-  if(onCanRun()&&active&&request.valid()){val token=++generation;busy=true;result=null;simulatedOffset=null;replay=NavReplayState();error=""
-   requestJob=scope.launch{try{val value=NavPrototypeService.calculate(request);if(token==generation&&active&&onCanRun()){result=value;error="전체 경로 계산 완료 · 모의 위치로만 재생합니다."}}catch(e:CancellationException){throw e}catch(e:Exception){if(token==generation)error="전체 경로를 계산하지 못했어요. 네트워크·공개 서버 상태를 확인 후 다시 시도하세요. 직선 경로로 대체하지 않습니다."}finally{if(token==generation)busy=false}}
+  if(onCanRun()&&active&&mapConsent.granted&&request.valid()&&!busy&&!waitingForStart){
+   val token=++generation;busy=true;waitingForStart=true;result=null;simulatedOffset=null;replay=NavReplayState();mapReadiness=NavigationMapReadiness.LOADING;error=""
+   startGate.begin(SimStartTicket(token,request,startWithSpeech&&speech.supportsContinuous))
+   requestJob=scope.launch{try{
+    val value=NavPrototypeService.calculate(request)
+    if(token==generation&&active&&onCanRun()&&mapConsent.granted){result=value}
+   }catch(e:CancellationException){throw e}catch(e:Exception){if(token==generation){startGate.cancel();waitingForStart=false;error="전체 경로를 계산하지 못했어요. 네트워크·공개 서버 상태를 확인 후 다시 시작하세요. 직선 경로로 대체하지 않습니다."}}
+   finally{if(token==generation)busy=false}}
   }
- }){Text("동의하고 이번 경로 계산")}},dismissButton={TextButton(onClick={consent=false}){Text("취소")}})
+ },enabled=active&&onCanRun(),modifier=Modifier.heightIn(min=64.dp)){Text(if(startWithSpeech&&speech.supportsContinuous)"동의하고 SIM·음성 시작" else "동의하고 SIM 시작")}},dismissButton={TextButton(onClick={cancelStart()},modifier=Modifier.heightIn(min=64.dp)){Text("취소")}})
 }
