@@ -435,9 +435,10 @@ class MainActivity : ComponentActivity() {
     }
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(25.dp)) {
         Column(Modifier.weight(.56f)) {
-            Box(Modifier.fillMaxWidth().height(heroHeight + 80.dp).clip(Corner)) {
+            Tag("${trip.nextStop} / 3  SCENES", White, Ink)
+            Spacer(Modifier.height(12.dp))
+            Box(Modifier.fillMaxWidth().height(publicMapCardHeightDp(androidx.compose.ui.platform.LocalDensity.current.fontScale).dp).clip(Corner)) {
                 RealRoadMap(route, Modifier.fillMaxSize())
-                Tag("${trip.nextStop} / 3  SCENES", White, Ink, Modifier.padding(20.dp))
             }
             Spacer(Modifier.height(20.dp))
             Surface(color = Ink, shape = Corner) {

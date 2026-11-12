@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
@@ -202,7 +203,7 @@ private val CardShape = RoundedCornerShape(16.dp)
  val context=LocalContext.current
  val road=remember(route.id){readRoad(context,route.id)}
  Column(modifier.clip(CardShape).background(White)) {
-  key(route.id){RealRoadMap(route,Modifier.fillMaxWidth().height(420.dp))}
+  key(route.id){RealRoadMap(route,Modifier.fillMaxWidth().height(publicMapCardHeightDp(LocalDensity.current.fontScale).dp))}
   Column(Modifier.padding(24.dp)) {
    Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(14.dp)) {
     Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
@@ -311,7 +312,7 @@ private val CardShape = RoundedCornerShape(16.dp)
  val rightWidth=if(split)(maxWidth-24.dp)*.40f else maxWidth
  FlowRow(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(24.dp),verticalArrangement=Arrangement.spacedBy(24.dp)) {
   Column(Modifier.width(leftWidth)) {
-   Box(Modifier.fillMaxWidth().height(if(split)500.dp else 360.dp).clip(CardShape)) {RealRoadMap(route,Modifier.fillMaxSize())}
+   Box(Modifier.fillMaxWidth().height(publicMapCardHeightDp(LocalDensity.current.fontScale).dp).clip(CardShape)) {RealRoadMap(route,Modifier.fillMaxSize())}
    Spacer(Modifier.height(20.dp))
    Column(Modifier.fillMaxWidth().padding(vertical=8.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){InlineStats(route);Text("${route.stops.size}개 기준점 · OSRM 도로 경로 · 정차·교통상황 제외",color=Muted,fontSize=16.sp)}
    Text("참고 경로입니다. 출발 전 내비와 현장 표지로 통제·진입 조건을 확인하세요.",color=Muted,fontSize=16.sp,lineHeight=24.sp,modifier=Modifier.padding(top=16.dp))
@@ -403,7 +404,7 @@ private val CardShape = RoundedCornerShape(16.dp)
    val mapWidth=if(maxWidth>=840.dp)(maxWidth-20.dp)*.65f else maxWidth
    val listWidth=if(maxWidth>=840.dp)(maxWidth-20.dp)*.35f else maxWidth
    FlowRow(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(20.dp),verticalArrangement=Arrangement.spacedBy(20.dp)){
-    Box(Modifier.width(mapWidth).height(460.dp).clip(CardShape)){RealRoadMap(selected,Modifier.fillMaxSize())}
+    Box(Modifier.width(mapWidth).height(publicMapCardHeightDp(LocalDensity.current.fontScale).dp).clip(CardShape)){RealRoadMap(selected,Modifier.fillMaxSize())}
     Column(Modifier.width(listWidth),verticalArrangement=Arrangement.spacedBy(14.dp)){
      visited.forEach{r->Surface(onClick={selected=r},color=if(selected.id==r.id)AtlasDark else White,shape=CardShape,modifier=Modifier.fillMaxWidth()){
       Column(Modifier.padding(24.dp)){Text(r.title,fontSize=22.sp,fontWeight=FontWeight.Bold,color=if(selected.id==r.id)Color.White else Ink);Text("${rows.count{it.id==r.id}}회 기록 · 모의 여정",fontSize=15.sp,color=if(selected.id==r.id)Color(0xFFC4D0E3) else Muted,modifier=Modifier.padding(top=9.dp))}

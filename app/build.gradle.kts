@@ -14,6 +14,8 @@ android {
  buildFeatures { compose = true; buildConfig = true }
 }
 dependencies {
+ // Stable release compatible with this project's Kotlin 2.0 compiler.
+ implementation("org.maplibre.gl:android-sdk:12.3.1")
  implementation("ai.pleos.playground:TextToSpeech:3.3.1")
  implementation("ai.pleos.playground:NaviHelper:3.0.5")
  implementation("ai.pleos.playground:FusedLocation:1.1.3")

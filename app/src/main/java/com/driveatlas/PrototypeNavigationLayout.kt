@@ -114,8 +114,7 @@ import java.util.Locale
    val wide=maxWidth>=700.dp
    val cardWidth=navigationInstructionWidth(maxWidth.value).dp
    val view=result?.snapshot(replay)
-   if(result==null)BaseCourseNavigationMap(route,Modifier.fillMaxSize())
-   else PrototypeRouteMap(result,simulatedOffset?:view!!.position,Modifier.fillMaxSize(),
+   CourseVectorNavigationMap(route,result,simulatedOffset?:view?.position,Modifier.fillMaxSize(),
     replayDistance=if(replay.offRoute)null else replay.distanceMeters,showStatusLabel=false,controlsEnabled=canBrowse)
    Surface(Modifier.align(Alignment.TopStart).padding(16.dp),color=White,shape=RoundedCornerShape(16.dp),shadowElevation=4.dp) {
     TextButton(shape=RoundedCornerShape(16.dp),onClick=::openDrawer,enabled=canBrowse,modifier=Modifier.size(72.dp)){Text("메뉴",fontSize=20.sp,fontWeight=FontWeight.Bold)}
