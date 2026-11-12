@@ -74,7 +74,7 @@ private val CardShape = RoundedCornerShape(10.dp)
     if(showBrand)Text("Drive Atlas",color=Ink,fontSize=23.sp,fontWeight=FontWeight.Bold)
     if(!narrow)DesignNavigationTabs(page,unlocked,onPage,Modifier.weight(1f)) else Spacer(Modifier.weight(1f))
     if(snapshot.trip!=null)TextButton(onClick={onPage("trip")},enabled=unlocked,modifier=Modifier.heightIn(min=64.dp)){Text("여정 계속",color=if(unlocked)AtlasGreen else Muted,fontSize=16.sp)}
-    TextButton(onClick=onDebug,modifier=Modifier.heightIn(min=64.dp)) {
+    TextButton(onClick=onDebug,enabled=unlocked,modifier=Modifier.heightIn(min=64.dp)) {
      Column(horizontalAlignment=Alignment.End,verticalArrangement=Arrangement.spacedBy(6.dp)) {
       Text(if(unlocked)"P · UX 해제 확인" else "차량 상태 확인/제한",fontSize=14.sp,color=Muted)
       Text("연결 상태 보기",fontSize=16.sp,color=Ink)

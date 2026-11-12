@@ -28,12 +28,13 @@ import kotlin.coroutines.coroutineContext
 import kotlin.math.*
 
 /** SIM-only camera. Loads only visible tiles, never a route corridor or offline region. */
-@Composable internal fun PrototypeRouteMap(route:NavPrototypeRoute,position:Point,modifier:Modifier=Modifier,replayDistance:Double?=null){
+@Composable internal fun PrototypeRouteMap(route:NavPrototypeRoute,position:Point,modifier:Modifier=Modifier,replayDistance:Double?=null,showStatusLabel:Boolean=true,controlsEnabled:Boolean=true){
  val context=LocalContext.current
  BoxWithConstraints(modifier.clipToBounds().background(Sage)){
   val d=LocalDensity.current;val w=with(d){maxWidth.roundToPx()};val h=with(d){maxHeight.roundToPx()}
   var follow by remember(route){mutableStateOf(true)}
   var manual by remember(route,w,h){mutableStateOf<MapViewport?>(null)}
+  LaunchedEffect(controlsEnabled){if(!controlsEnabled){follow=true;manual=null}}
   val fraction=remember(route){Animatable(1f)}
   var start by remember(route){mutableStateOf(replayDistance?:0.0)}
   var end by remember(route){mutableStateOf(replayDistance?:0.0)}
@@ -45,6 +46,7 @@ import kotlin.math.*
   }
   val viewport=if(follow)prototypeFollowViewport(displayed,w,h) else manual?:prototypeViewport(route.geometry,w,h)
   val latestViewport by rememberUpdatedState(viewport)
+  val latestControlsEnabled by rememberUpdatedState(controlsEnabled)
   val tileKeys=prototypeVisibleTileKeys(viewport)
   val cache=remember(route){mutableStateMapOf<PrototypeTileKey,MapTile>()}
   var loaded by remember(route){mutableStateOf(false)}
@@ -75,8 +77,10 @@ import kotlin.math.*
   Canvas(Modifier.fillMaxSize().pointerInput(route,w,h){
    detectDragGestures { change,delta ->
     change.consume()
-    val current=latestViewport
-    manual=prototypePanViewport(current,delta.x.toDouble(),delta.y.toDouble());follow=false
+    if(latestControlsEnabled){
+     val current=latestViewport
+     manual=prototypePanViewport(current,delta.x.toDouble(),delta.y.toDouble());follow=false
+    }
    }
   }){
    tiles.orEmpty().forEach{t->t.image?.let{drawImage(it,Offset((t.x*256-viewport.left).toFloat(),(t.y*256-viewport.top).toFloat()))}}
@@ -94,15 +98,15 @@ import kotlin.math.*
     }
    }
   }
-  Surface(Modifier.align(Alignment.TopStart).padding(12.dp),color=White.copy(alpha=.96f),shape=Corner){Text("SIM · 보라색: 모의 위치\n${if(follow)"위치 따라가기 · 북쪽 위" else "지도 둘러보기 · 북쪽 위"}",Modifier.padding(12.dp),color=Ink,fontSize=16.sp)}
-  Surface(Modifier.align(Alignment.BottomEnd).padding(end=12.dp,bottom=66.dp),color=White,shape=Corner){Row{
-   TextButton(onClick={follow=true;manual=null},modifier=Modifier.heightIn(min=64.dp)){Text(if(follow)"✓ 따라가기" else "따라가기",fontSize=16.sp)}
-   TextButton(onClick={follow=false;manual=prototypeViewport(route.geometry,w,h)},modifier=Modifier.heightIn(min=64.dp)){Text("전체 경로",fontSize=16.sp)}
+  if(showStatusLabel)Surface(Modifier.align(Alignment.TopStart).padding(12.dp),color=White.copy(alpha=.96f),shape=Corner){Text("SIM · 보라색: 모의 위치\n${if(follow)"위치 따라가기 · 북쪽 위" else "지도 둘러보기 · 북쪽 위"}",Modifier.padding(12.dp),color=Ink,fontSize=16.sp)}
+  Surface(Modifier.align(Alignment.BottomEnd).padding(end=12.dp,bottom=if(showStatusLabel)66.dp else 250.dp),color=White,shape=Corner){Row{
+   TextButton(onClick={if(latestControlsEnabled){follow=true;manual=null}},enabled=controlsEnabled,modifier=Modifier.heightIn(min=64.dp)){Text(if(follow)"✓ 따라가기" else "따라가기",fontSize=16.sp)}
+   TextButton(onClick={if(latestControlsEnabled){follow=false;manual=prototypeViewport(route.geometry,w,h)}},enabled=controlsEnabled,modifier=Modifier.heightIn(min=64.dp)){Text("전체 경로",fontSize=16.sp)}
   }}
   if(!loaded||loading&&tiles.none{it.image!=null})Surface(Modifier.align(Alignment.Center),color=White,shape=Corner){Text("지도 불러오는 중…",Modifier.padding(20.dp),color=Ink)}
-  else if(tiles.none{it.image!=null})Surface(Modifier.align(Alignment.Center).padding(30.dp),color=White,shape=Corner){Column(Modifier.padding(20.dp)){Text("지도를 불러오지 못했어요. 빈 지도에 경로를 그리지 않습니다.",color=Ink);TextButton(onClick={retry++},modifier=Modifier.heightIn(min=64.dp)){Text("다시 불러오기")}}}
+  else if(tiles.none{it.image!=null})Surface(Modifier.align(Alignment.Center).padding(30.dp),color=White,shape=Corner){Column(Modifier.padding(20.dp)){Text("지도를 불러오지 못했어요. 빈 지도에 경로를 그리지 않습니다.",color=Ink);TextButton(onClick={if(latestControlsEnabled)retry++},enabled=controlsEnabled,modifier=Modifier.heightIn(min=64.dp)){Text("다시 불러오기")}}}
   else if(!loading&&(tiles.size<tileKeys.size||tiles.any{it.image==null}))Surface(Modifier.align(Alignment.Center),color=White){Text("일부 지도 영역 불러오기 실패",Modifier.padding(12.dp),color=Ink)}
-  Surface(Modifier.align(Alignment.BottomStart).fillMaxWidth(),color=White.copy(alpha=.96f)){TextButton(onClick={openWeb(context,"https://www.openstreetmap.org/copyright")}){Text("© OpenStreetMap contributors · OSRM 도로 경로 · 실시간 교통 미반영",fontSize=13.sp,color=Ink)}}
+  Surface(Modifier.align(Alignment.BottomStart).fillMaxWidth(),color=White.copy(alpha=.96f)){TextButton(onClick={if(latestControlsEnabled)openWeb(context,"https://www.openstreetmap.org/copyright")},enabled=controlsEnabled){Text("© OpenStreetMap contributors · OSRM 도로 경로 · 실시간 교통 미반영",fontSize=13.sp,color=Ink)}}
  }
 }
 
@@ -114,6 +118,40 @@ internal fun prototypeViewport(points:List<Point>,width:Int,height:Int):MapViewp
  for(candidate in 0..16){val p=points.map{worldPoint(it,candidate)};if(p.maxOf{it.first}-p.minOf{it.first}<=usableWidth&&p.maxOf{it.second}-p.minOf{it.second}<=usableHeight)z=candidate else break}
  val p=points.map{worldPoint(it,z)}
  return MapViewport(z,(p.minOf{it.first}+p.maxOf{it.first})/2-width/2.0,(p.minOf{it.second}+p.maxOf{it.second})/2-height/2.0,width,height)
+}
+
+/** A bundled course preview, without the explorer's filters or fabricated replay position. */
+@Composable internal fun BaseCourseNavigationMap(route:Route,modifier:Modifier=Modifier) {
+ val context=LocalContext.current
+ val road=remember(route.id){readRoad(context,route.id)}
+ BoxWithConstraints(modifier.clipToBounds().background(Sage)) {
+  val density=LocalDensity.current
+  val width=with(density){maxWidth.roundToPx()};val height=with(density){maxHeight.roundToPx()}
+  val view=remember(route.id,width,height){prototypeViewport(road.points,width,height)}
+  var tiles by remember(view){mutableStateOf<List<MapTile>?>(null)}
+  var retry by remember{mutableIntStateOf(0)}
+  LaunchedEffect(view,retry){tiles=loadVisibleTiles(context,view)}
+  val path=remember(road,view){Path().apply{road.points.forEachIndexed{i,p->
+   val world=worldPoint(p,view.zoom);val x=(world.first-view.left).toFloat();val y=(world.second-view.top).toFloat()
+   if(i==0)moveTo(x,y)else lineTo(x,y)
+  }}}
+  Canvas(Modifier.fillMaxSize()){
+   tiles.orEmpty().forEach{tile->tile.image?.let{drawImage(it,Offset((tile.x*256-view.left).toFloat(),(tile.y*256-view.top).toFloat()))}}
+   if(tiles.orEmpty().any{it.image!=null}){
+    drawPath(path,White,style=Stroke(10f));drawPath(path,Coral,style=Stroke(5f))
+   }
+  }
+  if(tiles==null)Surface(Modifier.align(Alignment.Center),color=White,shape=Corner){Text("기본 코스 지도 불러오는 중…",Modifier.padding(20.dp),color=Ink)}
+  else if(tiles.orEmpty().none{it.image!=null})Surface(Modifier.align(Alignment.Center).padding(24.dp),color=White,shape=Corner){
+   Column(Modifier.padding(16.dp)){Text("지도를 불러오지 못했어요. 빈 지도에 경로를 그리지 않습니다.");TextButton(onClick={retry++},modifier=Modifier.heightIn(min=64.dp)){Text("다시 불러오기")}}
+  }
+  else if(tiles.orEmpty().any{it.image==null})Surface(Modifier.align(Alignment.Center),color=White){Text("일부 지도 영역 불러오기 실패",Modifier.padding(12.dp),color=Ink)}
+  Surface(Modifier.align(Alignment.BottomStart).fillMaxWidth(),color=White.copy(alpha=.96f)){
+   TextButton(onClick={openWeb(context,"https://www.openstreetmap.org/copyright")}){
+    Text("© OpenStreetMap contributors · OSRM 기본 코스 · 실시간 교통 미반영",fontSize=13.sp,color=Ink)
+   }
+  }
+ }
 }
 
 internal fun prototypeFollowViewport(position:Point,width:Int,height:Int):MapViewport {

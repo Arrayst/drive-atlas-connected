@@ -122,7 +122,7 @@ class MainActivity : ComponentActivity() {
         var preview by remember { mutableStateOf<Bitmap?>(null) }
         val pageScroll = rememberScrollState()
         LaunchedEffect(page, selected.id) { pageScroll.scrollTo(0) }
-        LaunchedEffect(engine.canEdit) { if (!engine.canEdit) { preview = null; navDialog = false; archiveDialog = false } }
+        LaunchedEffect(engine.canEdit) { if (!engine.canEdit) { preview = null; navDialog = false; archiveDialog = false; debug = false } }
         BackHandler(enabled = preview != null || debug || page != "discover") {
             when { debug -> debug = false; preview != null -> preview = null; else -> page = when(page) { "detail" -> detailReturn; "prototype-nav" -> previewEntry.returnPage; else -> "discover" } }
         }
@@ -135,15 +135,18 @@ class MainActivity : ComponentActivity() {
             val wide = maxWidth >= 1100.dp
             val compact = maxHeight < 740.dp
             val heroHeight = (maxHeight * .34f).coerceIn(360.dp, 400.dp)
-            Column(Modifier.fillMaxSize()) {
+            if(page=="prototype-nav") {
+                if(!engine.canEdit) SafetyPage(engine.safety,engine.snapshot.trip)
+                else PrototypeNavigationPage(familyEngine.snapshot,entry=previewEntry,onCanRun={engine.canEdit&&connectionState.emulator},onBack={page=previewEntry.returnPage},
+                    onPage={if(engine.canEdit){page=it;message=""}},onDebug={if(engine.canEdit)debug=true},hasTrip=engine.snapshot.trip!=null)
+            } else Column(Modifier.fillMaxSize()) {
                 Sidebar(page, engine.canEdit, engine.snapshot, wide, compact,
-                    onPage = { page = it; message = "" }, onDebug = { debug = true })
+                    onPage = { if(engine.canEdit){page = it; message = ""} }, onDebug = { if(engine.canEdit)debug = true })
                 Box(Modifier.weight(1f).fillMaxWidth()) {
                     if (!engine.canEdit) SafetyPage(engine.safety, engine.snapshot.trip)
                     else Column(Modifier.fillMaxSize().verticalScroll(pageScroll)
                         .padding(horizontal = if (wide) 36.dp else 24.dp, vertical = 30.dp)) {
                         when (page) {
-                            "prototype-nav" -> PrototypeNavigationPage(familyEngine.snapshot,entry=previewEntry,onCanRun={engine.canEdit&&connectionState.emulator},onBack={page=previewEntry.returnPage})
                             "auto-eta" -> AutoEtaPage(snapshot=familyEngine.snapshot,onCurrentPoint={connections.currentPlanningPoint()},onCanCalculate={engine.canEdit},
                                 onApply={value->var ok=false;act { if(engine.canEdit)ok=familyEngine.plan(value.routeId,withEta(familyEngine.snapshot.plans[value.routeId]?:FamilyPlan(),value),engine.safety) };ok},
                                 onFamily={page="family"},onPrototype=if(coursePreviewAllowed(BuildConfig.DEBUG,BuildConfig.SIMULATOR,connectionState.emulator,engine.canEdit))({previewEntry=CoursePreviewEntry(selected.id,"auto-eta");page="prototype-nav"}) else null)
@@ -205,7 +208,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-        if (debug) ConnectionsDialog(connectionState, onDismiss = { debug = false }, onRetry = { connections.retry() }, onLocationPermission = {
+        if (debug && engine.canEdit) ConnectionsDialog(connectionState, onDismiss = { debug = false }, onRetry = { if(engine.canEdit)connections.retry() }, onLocationPermission = {
             if (engine.canEdit) permissionRequest.launch(PleosConnections.LOCATION_PERMISSION)
         })
         val navigationPlan=familyEngine.snapshot.plans[selected.id]?:FamilyPlan()
