@@ -114,6 +114,7 @@ class MainActivity : ComponentActivity() {
         var debug by remember { mutableStateOf(false) }
         var curation by remember { mutableStateOf("recommended") }
         var detailReturn by remember { mutableStateOf("curation") }
+        var previewEntry by remember { mutableStateOf(CoursePreviewEntry(Catalog.routes.first().id, "auto-eta")) }
         val categoryFilters = remember { listOf("recommended", "season", "theme").associateWith { GuideFilters() } }
         val filters = categoryFilters.getValue(curation)
         var navDialog by remember { mutableStateOf(false) }
@@ -123,7 +124,7 @@ class MainActivity : ComponentActivity() {
         LaunchedEffect(page, selected.id) { pageScroll.scrollTo(0) }
         LaunchedEffect(engine.canEdit) { if (!engine.canEdit) { preview = null; navDialog = false; archiveDialog = false } }
         BackHandler(enabled = preview != null || debug || page != "discover") {
-            when { debug -> debug = false; preview != null -> preview = null; else -> page = if (page == "detail") detailReturn else "discover" }
+            when { debug -> debug = false; preview != null -> preview = null; else -> page = when(page) { "detail" -> detailReturn; "prototype-nav" -> previewEntry.returnPage; else -> "discover" } }
         }
         fun act(block: () -> Unit) {
             try { block() } catch (_: Exception) { message = "저장하지 못했어요. 주차 상태에서 다시 시도해 주세요." }
@@ -142,10 +143,10 @@ class MainActivity : ComponentActivity() {
                     else Column(Modifier.fillMaxSize().verticalScroll(pageScroll)
                         .padding(horizontal = if (wide) 36.dp else 24.dp, vertical = 30.dp)) {
                         when (page) {
-                            "prototype-nav" -> PrototypeNavigationPage(familyEngine.snapshot,onCanRun={engine.canEdit&&connectionState.emulator},onBack={page="auto-eta"})
+                            "prototype-nav" -> PrototypeNavigationPage(familyEngine.snapshot,entry=previewEntry,onCanRun={engine.canEdit&&connectionState.emulator},onBack={page=previewEntry.returnPage})
                             "auto-eta" -> AutoEtaPage(snapshot=familyEngine.snapshot,onCurrentPoint={connections.currentPlanningPoint()},onCanCalculate={engine.canEdit},
                                 onApply={value->var ok=false;act { if(engine.canEdit)ok=familyEngine.plan(value.routeId,withEta(familyEngine.snapshot.plans[value.routeId]?:FamilyPlan(),value),engine.safety) };ok},
-                                onFamily={page="family"},onPrototype=if(BuildConfig.DEBUG&&connectionState.emulator)({page="prototype-nav"}) else null)
+                                onFamily={page="family"},onPrototype=if(coursePreviewAllowed(BuildConfig.DEBUG,BuildConfig.SIMULATOR,connectionState.emulator,engine.canEdit))({previewEntry=CoursePreviewEntry(selected.id,"auto-eta");page="prototype-nav"}) else null)
                             "family" -> FamilyPage(familyEngine.snapshot,
                                 onPreferences = { value -> var ok=false;act { ok=familyEngine.preferences(value, engine.safety) };ok },
                                 onPlan = { id, plan -> var ok=false;act { ok=familyEngine.plan(id, plan, engine.safety) };ok },
@@ -164,7 +165,8 @@ class MainActivity : ComponentActivity() {
                             "curation" -> CurationPage(curation, filters, engine.snapshot.awards, ::open, { page = "discover" })
                             "records" -> RecordsPage(engine.snapshot, ::open)
                             "detail" -> RealDetailPage(selected, engine.snapshot.trip != null,
-                                onBack = { page = detailReturn }, onStart = { navDialog = true }, onTrip = { page = "trip" })
+                                onBack = { page = detailReturn }, onStart = { navDialog = true }, onTrip = { page = "trip" },
+                                onPreview = if(coursePreviewAllowed(BuildConfig.DEBUG,BuildConfig.SIMULATOR,connectionState.emulator,engine.canEdit))({previewEntry=CoursePreviewEntry(selected.id,"detail");page="prototype-nav";message=""}) else null)
                             "trip" -> TripPage(engine.snapshot.trip, engine.location, heroHeight,
                                 onDiscover = { page = "discover" }, onEvidence = { act {
                                     engine.snapshot.trip?.let { t ->

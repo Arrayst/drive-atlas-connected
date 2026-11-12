@@ -166,5 +166,5 @@ internal fun regionFor(route:Route)=when(route.id){"coast"->"강릉";"forest"->"
   }}
  }
 }
-@Composable internal fun RealDetailPage(route:Route,hasTrip:Boolean,onBack:()->Unit,onStart:()->Unit,onTrip:()->Unit) =
- DesignDetail(route,hasTrip,onBack,onStart,onTrip)
+@Composable internal fun RealDetailPage(route:Route,hasTrip:Boolean,onBack:()->Unit,onStart:()->Unit,onTrip:()->Unit,onPreview:(()->Unit)?=null) =
+ DesignDetail(route,hasTrip,onBack,onStart,onTrip,onPreview)

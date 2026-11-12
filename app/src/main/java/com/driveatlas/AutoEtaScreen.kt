@@ -6,6 +6,13 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -53,8 +60,8 @@ import java.util.Locale
  var editOrigin by remember { mutableStateOf(false) }
  var details by remember { mutableStateOf(false) }
  val route=Catalog.routes.first{it.id==routeId}
- TripHeading("코스까지 가는 길, 즐기고 돌아오는 길","가는 길 · 코스 주행 · 돌아오는 길을 나눠 보고, 걷기와 휴식은 가족 계획에 더하세요.")
- TripWorkspace(first={ pane ->
+ TripHeading("왕복 도로 시간","출발부터 복귀까지 계산합니다. 휴식과 걷기는 가족 계획에서 따로 더하세요.")
+ TripWorkspace(firstWeight=.36f,first={ pane ->
   Column(pane,verticalArrangement=Arrangement.spacedBy(20.dp)) {
    TripPanel {
     Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
@@ -74,14 +81,23 @@ import java.util.Locale
      },Modifier.fillMaxWidth())
     }
    }
-   if(!busy)TripPanel {
-    Text("어느 길을 다녀올까요?",color=Ink,fontSize=24.sp,fontWeight=FontWeight.Bold)
+   if(!busy)Column(verticalArrangement=Arrangement.spacedBy(4.dp)) {
+    Text("다녀올 코스",color=Ink,fontSize=22.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(vertical=12.dp))
     Catalog.routes.forEach { r ->
-     FilterChip(selected=r.id==routeId,onClick={routeId=r.id;reset()},enabled=!busy,
-      leadingIcon={TripSelectionMark(r.id==routeId)},
-      label={Text(r.title,fontSize=22.sp,fontWeight=FontWeight.SemiBold)},
-      modifier=Modifier.fillMaxWidth().heightIn(min=76.dp),shape=RoundedCornerShape(16.dp),
-      colors=FilterChipDefaults.filterChipColors(selectedContainerColor=Sage,selectedLabelColor=Coral,labelColor=Ink))
+     val interaction=remember(r.id){MutableInteractionSource()}
+     val focused by interaction.collectIsFocusedAsState()
+     Surface(onClick={routeId=r.id;reset()},color=if(r.id==routeId)Sage else androidx.compose.ui.graphics.Color.Transparent,
+      interactionSource=interaction,border=if(focused)BorderStroke(3.dp,Coral) else null,
+      shape=RoundedCornerShape(8.dp),modifier=Modifier.fillMaxWidth().heightIn(min=88.dp).semantics{selected=r.id==routeId;role=Role.RadioButton}) {
+      Row(Modifier.padding(18.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(14.dp)) {
+       TripSelectionMark(r.id==routeId)
+       Column(verticalArrangement=Arrangement.spacedBy(6.dp)) {
+        Text(r.title,fontSize=22.sp,fontWeight=FontWeight.SemiBold,color=Ink)
+        Text("${r.stops.size}개 코스 기준점",fontSize=18.sp,color=Muted)
+       }
+      }
+     }
+     HorizontalDivider(color=Line)
     }
    }
   }
@@ -98,15 +114,19 @@ import java.util.Locale
     Text("편도 시간을 두 배로 하지 않고\n돌아오는 도로까지 계산해요.",fontSize=21.sp,lineHeight=32.sp,color=Muted)
    }
    HorizontalDivider(color=Line,modifier=Modifier.padding(vertical=10.dp))
-   TripStop("1",originLabel,v?.let{"코스 첫 지점까지 ${tripDuration(it.outboundMinutes)} · 선택한 경유 순서 기준"}?:"공개 기준점 또는 직접 선택한 SDK 위치")
-   TripStop("2",route.title,v?.let{"코스 첫 지점 → 마지막 지점 ${tripDuration(it.courseMinutes)}"}?:"${route.stops.size}개 도로 기준점 경유")
-   selectedRestIds.sortedBy{restSlots[it]?:route.stops.lastIndex}.forEach { id -> RestFacilities.find(id,routeId)?.let { facility ->
-    TripStop("쉼",facility.name,if(facility.point==null)"좌표 미확인 · 계산할 수 없음" else "공개 시설 좌표 · 차량 진입점 미검증")
+   Text("구간별 도로 시간",fontSize=21.sp,fontWeight=FontWeight.SemiBold,color=Ink)
+   EtaSegment("가는 길",originLabel+" → "+route.stops.first().name,v?.outboundMinutes)
+   EtaSegment("코스 주행",route.stops.first().name+" → "+route.stops.last().name,v?.courseMinutes)
+   EtaSegment("돌아오는 길",route.stops.last().name+" → "+originLabel,v?.returnMinutes)
+   Text("선택한 경유 순서 기준 · 휴식지 이동은 해당 도로 구간에 포함",fontSize=17.sp,color=Muted)
+   HorizontalDivider(color=Line)
+   Text("경유 순서",fontSize=21.sp,fontWeight=FontWeight.SemiBold,color=Ink)
+   Text(RestItinerary.route(routeId,selectedRestIds,restSlots)?.stops?.joinToString(" → "){it.name}?:"좌표 확인 필요",fontSize=20.sp,lineHeight=30.sp,color=Ink)
+   selectedRestIds.forEach { id -> RestFacilities.find(id,routeId)?.let { facility ->
+    Text("${facility.name} · "+if(facility.point==null)"좌표 미확인 · 계산할 수 없음" else "공개 시설 좌표 · 차량 진입점 미검증",fontSize=18.sp,color=Muted)
    }}
-   if(selectedRestIds.isNotEmpty())Text("실제 경유 순서: "+(RestItinerary.route(routeId,selectedRestIds,restSlots)?.stops?.joinToString(" → "){it.name}?:"좌표 확인 필요"),fontSize=18.sp,color=Ink)
    if(selectedRestIds.isNotEmpty())Text("가족 계획에서 지정한 코스 구간에 휴식지를 삽입합니다. 휴식·걷기·여유 시간은 도로 예상 시간에 포함하지 않습니다.",fontSize=18.sp,color=Muted)
    if(!busy)SecondaryButton("휴식 장소·순서 변경",onFamily,Modifier.fillMaxWidth())
-   TripStop("3","같은 출발점으로",v?.let{"코스 마지막 지점 → 출발 ${tripDuration(it.returnMinutes)} · 선택한 경유 순서 기준"}?:"복귀 경로 포함")
    Spacer(Modifier.height(8.dp))
    if(busy){
     LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -154,4 +174,14 @@ import java.util.Locale
   val current=if(request.publicReferenceId==null)onCurrentPoint() else request.origin
   if(current==null||!nativePointMatches(request.origin,current)){message="위치가 변경되었거나 수신이 오래됐어요. 출발점을 다시 확인하세요."}
   else runCalculation(request.copy(allowApproximateRestPoints=true))}){Text("이번 요청에 동의하고 계산",fontSize=20.sp)}},dismissButton={TextButton(modifier=Modifier.sizeIn(minWidth=90.dp,minHeight=76.dp),onClick={consent=null}){Text("취소",fontSize=20.sp)}})}
+}
+
+@Composable private fun EtaSegment(label:String,route:String,minutes:Int?) {
+ Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(20.dp),verticalAlignment=Alignment.CenterVertically) {
+  Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(5.dp)) {
+   Text(label,fontSize=20.sp,fontWeight=FontWeight.SemiBold,color=Ink)
+   Text(route,fontSize=18.sp,lineHeight=26.sp,color=Muted)
+  }
+  Text(minutes?.let{tripDuration(it)}?:"계산 전",fontSize=24.sp,fontWeight=FontWeight.Bold,color=Ink)
+ }
 }
