@@ -1,10 +1,16 @@
 package com.driveatlas
 
+import androidx.compose.runtime.saveable.SaverScope
 import org.junit.Assert.*
 import org.junit.Test
 
 class FamilyMemoryDraftTest {
  private fun complete() = FamilyMemoryDraft(routeId="coast",kind=FamilyMemoryKind.ACTUAL,rating=4)
+ private fun restore(draft:FamilyMemoryDraft):FamilyMemoryDraft {
+  val scope=object:SaverScope { override fun canBeSaved(value:Any)=true }
+  val saved=checkNotNull(with(FamilyMemoryDraftSaver){scope.save(draft)})
+  return checkNotNull(FamilyMemoryDraftSaver.restore(saved))
+ }
 
  @Test fun newDraftDoesNotAnswerOnTheUsersBehalf() {
   val draft=FamilyMemoryDraft()
@@ -106,5 +112,59 @@ class FamilyMemoryDraftTest {
   assertEquals("매우 아쉬워요",familyRatingMeaning(1))
   assertEquals("보통이에요",familyRatingMeaning(3))
   assertEquals("매우 만족해요",familyRatingMeaning(5))
+ }
+
+ @Test fun saveableRoundTripKeepsUnansweredFieldsUnanswered() {
+  val draft=FamilyMemoryDraft()
+  assertEquals(draft,restore(draft))
+  assertFalse(restore(draft).canSave(0))
+ }
+
+ @Test fun saveableRoundTripRetainsPartiallyEnteredNewRecord() {
+  val draft=FamilyMemoryDraft(routeId="lake",note="입력 중인 메모",tripDate="2026-11-")
+  val restored=restore(draft)
+  assertEquals(draft,restored)
+  assertNull(restored.kind)
+  assertNull(restored.rating)
+  assertFalse(restored.canSave(0))
+ }
+
+ @Test fun saveableRoundTripRetainsAllNewRecordAnswers() {
+  val draft=complete().copy(kind=FamilyMemoryKind.SIM,note="아직 저장하지 않은 메모",tripDate="2026-11-12",feelingTags=listOf("편안했어요","다시 가고 싶어요"))
+  assertEquals(draft,restore(draft))
+ }
+
+ @Test fun restoringUnsavedEditDoesNotChangeTheStoredRecord() {
+  val memory=FamilyMemory("saved","lake","이전 차",2,"기존 메모",123L,true,"2024-02-29",listOf("피곤했어요"))
+  var stored=FamilySnapshot(memories=listOf(memory))
+  var writes=0
+  val engine=FamilyEngine(object:FamilyRepository {
+   override fun loadFamily()=stored
+   override fun saveFamily(snapshot:FamilySnapshot){writes++;stored=snapshot}
+  })
+  val draft=FamilyMemoryDraft.from(memory).copy(rating=5,note="수정 중인 메모")
+  val restored=restore(draft)
+  assertEquals(draft,restored)
+  assertEquals(listOf(memory),stored.memories)
+  assertEquals(0,writes)
+  // An interrupted screen must not bypass the engine's current safety check.
+  val rating=checkNotNull(restored.rating)
+  assertFalse(engine.editMemory(restored.id,rating,restored.note,Safety.UNKNOWN,restored.tripDate,restored.feelingTags))
+  assertFalse(engine.editMemory(restored.id,rating,restored.note,Safety.MOVING,restored.tripDate,restored.feelingTags))
+  assertEquals(0,writes)
+  assertEquals(listOf(memory),stored.memories)
+ }
+
+ @Test fun validationGuidanceTakesPriorityOverEarlierSaveFailure() {
+  assertEquals(FamilyMemoryFormNotice.REQUIRED_CHOICES,FamilyMemoryDraft().formNotice(0,false,true))
+  assertEquals(FamilyMemoryFormNotice.INVALID_DETAILS,complete().copy(tripDate="2026-11-").formNotice(0,false,true))
+  assertEquals(FamilyMemoryFormNotice.CAPACITY,complete().formNotice(500,false,true))
+ }
+
+ @Test fun failedSaveOnlyAppearsForAnOtherwiseSavableDraft() {
+  assertEquals(FamilyMemoryFormNotice.SAVE_FAILED,complete().formNotice(0,false,true))
+  assertEquals(FamilyMemoryFormNotice.NONE,complete().formNotice(0,false,false))
+  assertEquals(FamilyMemoryFormNotice.SAVE_FAILED,complete().formNotice(500,true,true))
+  assertEquals(FamilyMemoryFormNotice.NONE,complete().formNotice(500,true,false))
  }
 }

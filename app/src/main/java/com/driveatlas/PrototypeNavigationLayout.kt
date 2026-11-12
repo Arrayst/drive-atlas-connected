@@ -106,7 +106,7 @@ import java.util.Locale
      TextButton(shape=RoundedCornerShape(16.dp),onClick={parkedAction(onMapConsent)},enabled=canBrowse,modifier=Modifier.fillMaxWidth().heightIn(min=64.dp)){Text("지도 연결 동의 관리",fontSize=20.sp)}
      Text("시연·출처 안내",fontSize=22.sp,fontWeight=FontWeight.Bold)
      Text("주차·에뮬레이터 전용 / 시작 시 SIM·기기 내 음성 선택 · 실시간 교통·자동 이탈 재탐색 미지원",fontSize=16.sp,color=Muted)
-     Text("길찾기 시작에서 SIM·음성 안내를 함께 시작할 수 있어요. 정지·화면 이탈 시 음성은 꺼지고 수동 재개해도 다시 켜지지 않습니다. 음성 ON은 10m/s, OFF는 100m/s 모의 재생입니다. 촘촘한 지시는 생략될 수 있으며 실제 운전에 사용할 수 없습니다.",fontSize=16.sp,color=Muted)
+     Text("길찾기 시작에서 SIM·음성 안내를 함께 시작할 수 있어요. 정지·화면 이탈 시 음성은 꺼지고 수동 재개해도 다시 켜지지 않습니다. 음성 켜기·끄기, 오류 또는 재개와 관계없이 ${SimReplayMetersPerSecond}m/s로 모의 재생합니다. 촘촘한 지시는 생략될 수 있으며 실제 운전에 사용할 수 없습니다.",fontSize=16.sp,color=Muted)
      Text("지점 좌표는 차량 진입구로 검증되지 않았습니다. 개발용 OSRM 공개 서버와 OSM 지도: 연결 필요·가동 보장 없음. 공개 기준점 시연이며 실제 운전에 사용하지 마세요.",fontSize=16.sp,color=Muted)
      Text("실제 장소·지도 · 방문/주행은 모의 체험 · 운전 중 조작 금지",fontSize=16.sp,color=Muted)
     }
@@ -157,7 +157,7 @@ import java.util.Locale
       OutlinedButton(shape=RoundedCornerShape(16.dp),onClick={if(active&&canRun)onToggleSpeech()},enabled=active&&canRun&&replay.running&&!replay.offRoute&&canContinuous&&mapReadiness==NavigationMapReadiness.READY,modifier=Modifier.heightIn(min=64.dp)){Text(if(autoSpeech)"음성 끄기" else "음성 켜기",fontSize=20.sp)}
      }
      Text(if(view==null)"SIM · 실제 차량 주행 아님 · 시작할 때 기기 내 음성 선택" else speechStatus,fontSize=15.sp,color=Muted,maxLines=2,overflow=TextOverflow.Ellipsis)
-     if(view!=null)Text("SIM · 실제 길안내 아님 · ${if(autoSpeech)10 else 100}m/s 모의 재생",fontSize=14.sp,color=Muted)
+     if(view!=null)Text("SIM · 실제 길안내 아님 · ${SimReplayMetersPerSecond}m/s 모의 재생",fontSize=14.sp,color=Muted)
      if(error.isNotEmpty())Text(error,fontSize=15.sp,color=Ink,maxLines=3,overflow=TextOverflow.Ellipsis)
     }
    }

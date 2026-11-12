@@ -57,4 +57,22 @@ class VectorMapConsentStoreTest {
   assertTrue(scope.token.contains(NavigationVectorStyle.tileJson)); assertTrue(scope.token.contains(scope.purpose))
   assertFalse(scope.token.contains("37.")); assertFalse(scope.token.contains("family")); assertFalse(scope.token.contains("router.project-osrm.org"))
  }
+ @Test fun failedWithdrawalTitleAndMessageNeverClaimSavedRevocation() {
+  val storage=MemoryStorage(scope.token).apply{fail=true};val state=VectorMapConsentState(storage)
+  val saved=state.withdraw()
+  assertFalse(saved);assertFalse(state.granted)
+  assertEquals("지도 연결 차단 · 저장 삭제 실패",vectorMapConsentDialogTitle(state.granted,state.withdrawalPending))
+  val message=vectorMapWithdrawalMessage(saved,state.error)
+  assertEquals(state.error,message);assertTrue(message.contains("삭제하지 못했어요"));assertFalse(message.contains("철회했어요"))
+  assertTrue(vectorMapWithdrawalMessage(false,"").contains("삭제하지 못했어요"))
+ }
+ @Test fun successfulWithdrawalRetryCanReportDurableSuccess() {
+  val storage=MemoryStorage(scope.token).apply{fail=true};val state=VectorMapConsentState(storage)
+  assertFalse(state.withdraw());storage.fail=false
+  val saved=state.withdraw()
+  assertTrue(saved);assertFalse(state.withdrawalPending);assertEquals("",state.error)
+  assertEquals("OpenFreeMap 지도 연결",vectorMapConsentDialogTitle(state.granted,state.withdrawalPending))
+  assertTrue(vectorMapWithdrawalMessage(saved,state.error).contains("철회했어요"));assertNull(storage.value)
+ }
+
 }

@@ -45,6 +45,40 @@ The implementation adds tests for provider consent/debug gating, original vector
 
 Sources: [MapLibre Android quickstart](https://github.com/maplibre/maplibre-native/blob/main/platform/android/docs/getting-started.md), [MapLibre local glyph options](https://maplibre.org/maplibre-native/android/api/-map-libre%20-native%20-android/org.maplibre.android.maps/-map-libre-map-options/index.html), [official 12.3.1 Maven artifacts](https://repo.maven.apache.org/maven2/org/maplibre/gl/android-sdk/12.3.1/), [OpenFreeMap](https://openfreemap.org/), [OpenFreeMap terms](https://openfreemap.org/tos/), [OpenMapTiles schema](https://openmaptiles.org/schema/), [OpenStreetMap copyright](https://www.openstreetmap.org/copyright).
 
+### Retry host identity correction
+
+Audit found that retry replaced the remembered `MapView` and destroyed its predecessor, but the original unkeyed `AndroidView` retained its existing native child. Updating a captured factory value does not rerun that factory. This could leave callbacks pointing to a new map while the UI still hosted the destroyed old view.
+
+Both navigation and public exploration now use `VectorMapViewHost`, whose Compose identity is keyed to the actual native view instance. A retry therefore removes the previous AndroidView host and mounts the replacement. Ordinary camera/replay recompositions retain the same instance. Destruction remains owned only by `rememberVectorMapView`; the host adds no second `onDestroy` call and no reuse/onReset path.
+
+The first integration run passed the existing 287 JVM tests, but all three newly added Compose identity tests failed because `android.os.Trace.beginSection` is not available in the plain JVM environment. These tests have been moved to `androidTest`; Android tracing is not mocked and default-return behavior has not been enabled.
+
+The Android regression suite now has two classes:
+
+- `VectorMapViewInstanceTest`: three Compose identity/factory/disposal tests, now running on the real Android runtime.
+- `VectorMapViewHostInstrumentedTest`: three tests using real `MapView` instances and the production `rememberVectorMapView` / `VectorMapViewHost`. They check local style loading, completed rendering, center-pixel snapshot color, nonzero size and actual window/parent attachment; two consecutive replacements and each predecessor's detachment/`isDestroyed`; stable-instance recomposition; and removal/re-entry without reviving the old view.
+
+The native tests use an empty, non-exported debug-only `VectorMapHostTestActivity`, not `MainActivity`. They do not initialize vehicle connections, access family records, or use provider consent/storage. Styles are inline background-only JSON with empty sources and no URL, tile, glyph or sprite resources. No network/security setting is changed. Existing cached AndroidJUnitRunner 1.6.1 and Compose UI test 1.6.6 dependencies are reused; no dependency was added. The Activity is absent from release builds.
+
+The moved/new instrumentation sources have not yet been compiled or executed. Earlier APK hashes and runtime results below do not certify this correction. Source-only checks are not evidence that an actual map recovered from failure.
+
+When the approved emulator slot is available, build with the existing offline toolchain:
+
+`./gradlew testDebugUnitTest lintDebug assembleDebug assembleRelease assembleDebugAndroidTest --offline`
+
+Install the resulting debug and androidTest APKs on that emulator without clearing app data, then run the explicit suite:
+
+`adb -s <approved-emulator> shell am instrument -w -e class com.driveatlas.VectorMapViewInstanceTest,com.driveatlas.VectorMapViewHostInstrumentedTest com.driveatlas.connected.emulator.test/androidx.test.runner.AndroidJUnitRunner`
+
+The test APK is expected at `app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk`. Installation and execution must be coordinated with other device QA; no test should run on a physical vehicle.
+
+Verification after the audit releases the build/device slot:
+
+1. Run the full JVM/lint/debug/release checks, compile the Android test APK, and run both Android regression classes on the approved emulator.
+2. In each map screen, exercise an existing controlled map-load failure and tap Retry twice. Confirm the old native view detaches, the new view attaches and renders, route/place overlays return only with current road evidence, and gestures/overview address the new view.
+3. Repeat failure → Retry → leave screen → return, and background/foreground during loading. Check for stale callbacks, duplicate destruction, native crashes or a permanently blank host.
+4. Confirm ordinary replay/camera updates do not replace the native view and parked-only controls remain enforced. No physical vehicle, new provider, OS networking change or permissions change is required for these checks.
+
 ## Recorded emulator verification (2026-11-12)
 
 Final debug APK SHA-256: `f9ac33781dee6d8466dc5a1d63bd907ec917bd398ede3c80cf2890e238d9440f`.

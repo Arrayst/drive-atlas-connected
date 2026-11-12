@@ -1,13 +1,27 @@
 package com.driveatlas
 
 import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import org.maplibre.android.MapLibre
 import org.maplibre.android.maps.MapLibreMapOptions
 import org.maplibre.android.maps.MapView
+
+/** A replacement native view needs a replacement Compose host, not just a new factory capture. */
+@Composable internal fun <T : Any> WithVectorMapViewInstance(view: T, content: @Composable (T) -> Unit) {
+ key(view) { content(view) }
+}
+
+@Composable internal fun VectorMapViewHost(view: MapView, modifier: Modifier = Modifier) {
+ WithVectorMapViewInstance(view) { instance ->
+  // No view-reuse/onReset path: a MapView destroyed by the old lifecycle must never be reused.
+  AndroidView(factory = { instance }, modifier = modifier)
+ }
+}
 
 /** Must be called only after provider consent. No location component or offline region. */
 @Suppress("DEPRECATION")

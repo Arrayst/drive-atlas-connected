@@ -2,6 +2,7 @@ package com.driveatlas
 
 import java.time.LocalDate
 import java.util.UUID
+import androidx.compose.runtime.saveable.mapSaver
 
 internal enum class FamilyMemoryKind(val label: String, val simulated: Boolean) {
  ACTUAL("실제 여행", false),
@@ -36,6 +37,22 @@ internal data class FamilyMemoryDraft(
    feelingTags = memory.feelingTags
   )
  }
+}
+
+/** Used by the outer page state holder when the safety gate removes its composition. */
+internal val FamilyMemoryDraftSaver=mapSaver(
+ save={draft:FamilyMemoryDraft -> mapOf("id" to draft.id,"route" to draft.routeId.orEmpty(),"kind" to (draft.kind?.name?:""),"rating" to (draft.rating?:0),"note" to draft.note,"date" to draft.tripDate,"feelings" to ArrayList(draft.feelingTags))},
+ restore={values -> FamilyMemoryDraft(id=values["id"] as String,routeId=(values["route"] as String).ifEmpty{null},kind=FamilyMemoryKind.entries.firstOrNull{it.name==values["kind"]},rating=(values["rating"] as Int).takeIf{it in 1..5},note=values["note"] as String,tripDate=values["date"] as String,feelingTags=(values["feelings"] as List<*>).filterIsInstance<String>())}
+)
+
+internal enum class FamilyMemoryFormNotice { REQUIRED_CHOICES, INVALID_DETAILS, CAPACITY, SAVE_FAILED, NONE }
+
+internal fun FamilyMemoryDraft.formNotice(memoryCount:Int,editing:Boolean,saveFailed:Boolean):FamilyMemoryFormNotice = when {
+ !requiredChoicesComplete -> FamilyMemoryFormNotice.REQUIRED_CHOICES
+ !detailsValid -> FamilyMemoryFormNotice.INVALID_DETAILS
+ !editing && memoryCount>=500 -> FamilyMemoryFormNotice.CAPACITY
+ saveFailed -> FamilyMemoryFormNotice.SAVE_FAILED
+ else -> FamilyMemoryFormNotice.NONE
 }
 
 internal fun validMemoryDate(value: String): Boolean = value.isBlank() ||

@@ -42,12 +42,12 @@ internal fun vectorMapConnectionAllowed(purpose: VectorMapPurpose, debug: Boolea
 
 @Composable internal fun VectorMapConsentDialog(
  consent: VectorMapConsentState, controlsEnabled: Boolean,
- onDismiss: () -> Unit, onAccepted: () -> Unit = onDismiss, onWithdrawn: () -> Unit = {},
+ onDismiss: () -> Unit, onAccepted: () -> Unit = onDismiss, onWithdrawalResult: (Boolean) -> Unit = {},
 ) {
  val context = LocalContext.current
  AlertDialog(
   onDismissRequest = onDismiss,
-  title = { Text(if (consent.granted) "저장된 지도 연결 동의" else "OpenFreeMap 지도 연결") },
+  title = { Text(vectorMapConsentDialogTitle(consent.granted, consent.withdrawalPending)) },
   text = { Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
    Text("범위: 공개 코스·기준점 지도 표시. 코스 탐색과 에뮬레이터 SIM 경로 화면에 함께 적용됩니다. SIM 재생은 개발용 에뮬레이터에서만 가능합니다.")
    Text("표시하는 공개 지역과 IP 주소가 OpenFreeMap 및 Cloudflare에 전달됩니다. 실제 위치·집 주소·가족 정보는 보내지 않습니다.")
@@ -61,9 +61,9 @@ internal fun vectorMapConnectionAllowed(purpose: VectorMapPurpose, debug: Boolea
    if (consent.error.isNotEmpty()) Text(consent.error, color = Ink)
   } },
   confirmButton = {
-   if (consent.granted || consent.withdrawalPending) TextButton(onClick = { if (controlsEnabled) { val saved = consent.withdraw(); onWithdrawn(); if (saved) onDismiss() } }, enabled = controlsEnabled, modifier = Modifier.heightIn(min = 64.dp)) { Text(if (consent.withdrawalPending) "철회 다시 시도" else "지도 연결 동의 철회") }
+   if (consent.granted || consent.withdrawalPending) TextButton(onClick = { if (controlsEnabled) { val saved = consent.withdraw(); onWithdrawalResult(saved); if (saved) onDismiss() } }, enabled = controlsEnabled, modifier = Modifier.heightIn(min = 64.dp)) { Text(if (consent.withdrawalPending) "철회 다시 시도" else "지도 연결 동의 철회") }
    else TextButton(onClick = { if (controlsEnabled && consent.accept()) onAccepted() }, enabled = controlsEnabled, modifier = Modifier.heightIn(min = 64.dp)) { Text("동의하고 연결 기억") }
   },
-  dismissButton = { TextButton(onClick = onDismiss, modifier = Modifier.heightIn(min = 64.dp)) { Text(if (consent.granted) "닫기" else "취소") } },
+  dismissButton = { TextButton(onClick = onDismiss, modifier = Modifier.heightIn(min = 64.dp)) { Text(if (consent.granted || consent.withdrawalPending) "닫기" else "취소") } },
  )
 }

@@ -18,7 +18,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
 import kotlinx.coroutines.delay
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
@@ -163,7 +162,7 @@ import org.maplibre.geojson.Point as GeoPoint
  }
  BoxWithConstraints(modifier) {
   val width = with(density) { maxWidth.roundToPx() }; val height = with(density) { maxHeight.roundToPx() }
-  AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize())
+  VectorMapViewHost(mapView, Modifier.fillMaxSize())
   LaunchedEffect(map, style, follow, displayed, heading, width, height) {
    val ready = map ?: return@LaunchedEffect
    if (style == null || width <= 0 || height <= 0) return@LaunchedEffect

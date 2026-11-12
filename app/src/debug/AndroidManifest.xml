@@ -1,0 +1,8 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+ <application>
+  <!-- Instrumentation-only host: no launcher entry, exported access, vehicle connection or storage. -->
+  <activity android:name=".VectorMapHostTestActivity"
+   android:exported="false"
+   android:theme="@android:style/Theme.Material.NoActionBar"/>
+ </application>
+</manifest>

@@ -180,7 +180,7 @@ private class AndroidOfflinePreview(context:Context,val status:(String)->Unit){
  LaunchedEffect(replay.running,result,active){
   val r=result
   if(r!=null&&replay.running&&active){
-   while(replay.running&&active&&onCanRun()) {delay(1000);if(active&&onCanRun()&&mapReadiness==NavigationMapReadiness.READY)replay=r.advance(replay,if(autoSpeech)10.0 else 100.0)}
+   while(replay.running&&active&&onCanRun()) {delay(1000);if(active&&onCanRun()&&mapReadiness==NavigationMapReadiness.READY)replay=r.advanceSimTick(replay)}
    if(!active||!onCanRun()){cancelStart()}
   }
  }
@@ -242,7 +242,7 @@ private class AndroidOfflinePreview(context:Context,val status:(String)->Unit){
  if(mapDialog)VectorMapConsentDialog(mapConsent,active&&onCanRun(),
   onDismiss={mapDialog=false;startAfterMapConsent=false},
   onAccepted={mapDialog=false;val continueStart=startAfterMapConsent;startAfterMapConsent=false;if(continueStart&&active&&onCanRun())consent=true},
-  onWithdrawn={cancelStart();mapReadiness=NavigationMapReadiness.DISCONNECTED;error="지도 연결 동의를 철회했어요. 다시 연결하기 전에는 지도를 요청하지 않습니다."})
+  onWithdrawalResult={saved->cancelStart();mapReadiness=NavigationMapReadiness.DISCONNECTED;error=vectorMapWithdrawalMessage(saved,mapConsent.error)})
  if(consent&&request.valid())AlertDialog(onDismissRequest={cancelStart()},title={Text("공개 좌표로 SIM 길찾기를 시작할까요?")},text={Column(Modifier.heightIn(max=400.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(10.dp)){
   Text("받는 곳: router.project-osrm.org OSRM 공개 서버. 요청은 서버에 기록될 수 있습니다. 실제 집 주소·현재 GPS·가족 메모는 보내지 않습니다.")
   Text("출발·귀가: ${request.departure()?.label}\n코스: ${Catalog.routes.first{it.id==routeId}.title}\n선택 쉼터: ${request.selectedRestIds.joinToString{RestFacilities.find(it,routeId)?.name?:it}.ifEmpty{"없음"}}")

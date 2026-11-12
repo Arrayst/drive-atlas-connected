@@ -10,13 +10,16 @@ internal class SimSpeechCueScheduler {
  private val spoken=mutableSetOf<Pair<Int,Int>>()
  fun reset(){activeStep=null;issuedAt=null;lastIssuedAt=null;spoken.clear()}
  fun tick(step:Int,distance:Double,instruction:String,now:Long,busy:Boolean,allowed:Boolean,startedAtMillis:Long?=null):SimSpeechDecision {
+  // Completion releases the active request, not the spoken-band history or cooldown.
+  // A later step/timeout must not report cancelling an utterance that already ended.
+  if(!busy){activeStep=null;issuedAt=null}
   if(!allowed||step<0||!distance.isFinite()||distance<0||now<0){val cancel=activeStep!=null;reset();return SimSpeechDecision(cancel)}
   val age=issuedAt?.let{now-it}?:0L
   // Allow a valid local utterance beyond six seconds, but never a stale step or an unbounded request.
   val cancel=activeStep!=null&&(activeStep!=step||(if(startedAtMillis!=null)now-startedAtMillis>=SimSpeechPlaybackTimeoutMillis else age>=15000)||age<0)
   if(cancel){activeStep=null;issuedAt=null}
   if(busy&&!cancel)return SimSpeechDecision()
-  // Opt-in speech slows replay to 10 m/s. Never queue a backlog of turns.
+  // Replay stays at 10 m/s independently of speech. Never queue a backlog of turns.
   val band=when {distance<=200->0;distance<=800->1;else->return SimSpeechDecision(cancel)}
   val key=step to band
   if(key in spoken||instruction.isBlank()||lastIssuedAt?.let{now-it<8000}==true)return SimSpeechDecision(cancel)

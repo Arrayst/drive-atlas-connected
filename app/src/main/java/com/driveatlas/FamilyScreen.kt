@@ -386,16 +386,12 @@ private fun clockLabel(minute:Int?)=minute?.let{String.format(Locale.KOREA,"%02d
  }
 }
 
-private val MemoryDraftSaver=androidx.compose.runtime.saveable.mapSaver(
- save={draft:FamilyMemoryDraft -> mapOf("id" to draft.id,"route" to draft.routeId.orEmpty(),"kind" to (draft.kind?.name?:""),"rating" to (draft.rating?:0),"note" to draft.note,"date" to draft.tripDate,"feelings" to ArrayList(draft.feelingTags))},
- restore={values -> FamilyMemoryDraft(id=values["id"] as String,routeId=(values["route"] as String).ifEmpty{null},kind=FamilyMemoryKind.entries.firstOrNull{it.name==values["kind"]},rating=(values["rating"] as Int).takeIf{it in 1..5},note=values["note"] as String,tripDate=values["date"] as String,feelingTags=(values["feelings"] as List<*>).filterIsInstance<String>())}
-)
-
 @OptIn(ExperimentalLayoutApi::class)
 @Composable private fun MemoryEditorDialog(initialDraft:FamilyMemoryDraft,memoryCount:Int,editing:Boolean,currentTrip:Trip?,onCancel:()->Unit,onSave:(FamilyMemoryDraft)->Boolean) {
- var draft by rememberSaveable(initialDraft.id,stateSaver=MemoryDraftSaver){mutableStateOf(initialDraft)}
+ var draft by rememberSaveable(initialDraft.id,stateSaver=FamilyMemoryDraftSaver){mutableStateOf(initialDraft)}
  var detailsOpen by rememberSaveable(initialDraft.id){mutableStateOf(false)}
- var saveError by remember{mutableStateOf(false)}
+ // A failed attempt applies only until the user changes an input, not to later drafts.
+ var saveError by remember(draft){mutableStateOf(false)}
  Dialog(onDismissRequest=onCancel,properties=DialogProperties(usePlatformDefaultWidth=false)) {
   Surface(Modifier.widthIn(max=1100.dp).fillMaxWidth(.94f).fillMaxHeight(.94f).imePadding(),shape=RoundedCornerShape(12.dp),color=White) {
    Column {
@@ -443,10 +439,13 @@ private val MemoryDraftSaver=androidx.compose.runtime.saveable.mapSaver(
     }
     HorizontalDivider(color=Line)
     Column(Modifier.fillMaxWidth().padding(horizontal=24.dp,vertical=16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
-     if(saveError)Text("저장하지 못했어요. 입력과 주차 상태를 확인하세요. 입력한 내용은 유지됩니다.",color=Coral,fontSize=17.sp)
-     else if(!draft.requiredChoicesComplete)Text("코스, 기록 종류, 만족도를 모두 선택하면 저장할 수 있어요.",color=Muted,fontSize=17.sp)
-     else if(!draft.detailsValid)Text("날짜·메모·느낌을 펼쳐 입력을 확인해 주세요.",color=Coral,fontSize=17.sp)
-     else if(!editing&&memoryCount>=500)Text("기억 500개 한도에 도달해 새 기억을 저장할 수 없어요.",color=Coral,fontSize=17.sp)
+     when(draft.formNotice(memoryCount,editing,saveError)) {
+      FamilyMemoryFormNotice.REQUIRED_CHOICES -> Text("코스, 기록 종류, 만족도를 모두 선택하면 저장할 수 있어요.",color=Muted,fontSize=17.sp)
+      FamilyMemoryFormNotice.INVALID_DETAILS -> Text("날짜·메모·느낌을 펼쳐 입력을 확인해 주세요.",color=Coral,fontSize=17.sp)
+      FamilyMemoryFormNotice.CAPACITY -> Text("기억 500개 한도에 도달해 새 기억을 저장할 수 없어요.",color=Coral,fontSize=17.sp)
+      FamilyMemoryFormNotice.SAVE_FAILED -> Text("저장하지 못했어요. 입력과 주차 상태를 확인하세요. 입력한 내용은 유지됩니다.",color=Coral,fontSize=17.sp)
+      FamilyMemoryFormNotice.NONE -> Unit
+     }
      Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(16.dp)) {
       SecondaryButton(if(editing)"변경 취소" else "취소",onCancel,Modifier.weight(.35f))
       PrimaryButton(if(editing)"수정 저장" else "기억 저장",{if(draft.canSave(memoryCount,editing))saveError=!onSave(draft)},Modifier.weight(.65f),enabled=draft.canSave(memoryCount,editing))

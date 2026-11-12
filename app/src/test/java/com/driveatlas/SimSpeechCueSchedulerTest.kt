@@ -19,4 +19,27 @@ class SimSpeechCueSchedulerTest {
  @Test fun nearerBandAllowedOnlyAfterCooldown(){val s=SimSpeechCueScheduler();s.tick(1,700.0,"좌회전",0,false,true);assertNull(s.tick(1,100.0,"좌회전",1000,false,true).text);assertNotNull(s.tick(1,100.0,"좌회전",8000,false,true).text)}
  @Test fun disableCancelsAndResetStartsNewSession(){val s=SimSpeechCueScheduler();s.tick(1,700.0,"좌회전",0,false,true);assertTrue(s.tick(1,600.0,"좌회전",100,true,false).cancel);assertNotNull(s.tick(1,600.0,"좌회전",200,false,true).text)}
  @Test fun orderedIndexDisambiguatesSameInstructionOnReturn(){val s=SimSpeechCueScheduler();s.tick(1,600.0,"좌회전",0,false,true);assertNotNull(s.tick(21,600.0,"좌회전",9000,false,true).text)}
+ @Test fun completedUtteranceDoesNotReportCancellationAtNextStep(){
+  val s=SimSpeechCueScheduler();s.tick(1,700.0,"좌회전",0,false,true)
+  val completed=s.tick(2,600.0,"우회전",4000,false,true)
+  assertFalse(completed.cancel);assertNull(completed.text)
+  assertNotNull(s.tick(2,500.0,"우회전",8000,false,true).text)
+ }
+ @Test fun completedUtteranceDoesNotTimeoutOrRepeatItsBand(){
+  val s=SimSpeechCueScheduler();s.tick(1,700.0,"좌회전",0,false,true)
+  val completed=s.tick(1,600.0,"좌회전",16000,false,true,0)
+  assertFalse(completed.cancel);assertNull(completed.text)
+  assertNull(s.tick(1,500.0,"좌회전",24000,false,true).text)
+ }
+ @Test fun completionKeepsCooldownAndAllowsANewerApproachBand(){
+  val s=SimSpeechCueScheduler();s.tick(1,700.0,"좌회전",0,false,true)
+  assertNull(s.tick(1,180.0,"좌회전",7999,false,true).text)
+  val nearer=s.tick(1,170.0,"좌회전",8000,false,true)
+  assertFalse(nearer.cancel);assertNotNull(nearer.text)
+ }
+ @Test fun disablingAfterCompletionDoesNotCancelAnIdleEngine(){
+  val s=SimSpeechCueScheduler();s.tick(1,700.0,"좌회전",0,false,true)
+  assertFalse(s.tick(1,600.0,"좌회전",4000,false,false).cancel)
+ }
+
 }

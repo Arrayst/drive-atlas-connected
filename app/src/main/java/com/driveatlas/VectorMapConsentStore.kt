@@ -51,7 +51,7 @@ internal class VectorMapConsentState(private val storage: VectorConsentStorage, 
   granted = false
   val saved = runCatching { storage.clear() }.getOrDefault(false)
   withdrawalPending = !saved
-  error = if (saved) "" else "이 화면의 연결은 껐지만 저장된 동의를 삭제하지 못했어요. 앱을 다시 열기 전에 철회를 다시 시도해 주세요."
+  error = if (saved) "" else "이 앱의 지도 연결은 차단했지만 저장된 동의를 삭제하지 못했어요. 앱을 다시 열기 전에 철회를 다시 시도해 주세요."
   return saved
  }
 }
@@ -63,3 +63,12 @@ private object VectorMapConsentOwner {
  val context = LocalContext.current
  return remember(context.applicationContext) { VectorMapConsentOwner.get(context) }
 }
+
+internal fun vectorMapConsentDialogTitle(granted: Boolean, withdrawalPending: Boolean): String = when {
+ withdrawalPending -> "지도 연결 차단 · 저장 삭제 실패"
+ granted -> "저장된 지도 연결 동의"
+ else -> "OpenFreeMap 지도 연결"
+}
+internal fun vectorMapWithdrawalMessage(saved: Boolean, error: String): String =
+ if (saved) "지도 연결 동의를 철회했어요. 다시 연결하기 전에는 지도를 요청하지 않습니다."
+ else error.ifBlank { "지도 연결은 차단했지만 저장된 동의를 삭제하지 못했어요. 철회를 다시 시도해 주세요." }

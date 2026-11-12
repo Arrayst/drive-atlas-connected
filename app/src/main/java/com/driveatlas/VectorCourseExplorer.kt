@@ -26,7 +26,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
 import kotlinx.coroutines.delay
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
@@ -177,7 +176,7 @@ import kotlin.math.roundToInt
   val targetsEnabled = mapPlaceMarkersEnabled(maxWidth.value, maxHeight.value, density.fontScale)
   val visible = if (targetsEnabled) projected.filter { mapPlaceTargetFits(it.position, width.toFloat(), height.toFloat(), half, rightInset) } else emptyList()
   val clusters = clusterMapPlaceTargets(visible, with(density) { 72.dp.toPx() })
-  AndroidView(factory = { view }, modifier = Modifier.fillMaxSize())
+  VectorMapViewHost(view, Modifier.fillMaxSize())
   LaunchedEffect(map, style, road, allPlaces, width, height, overview) {
    val ready = map ?: return@LaunchedEffect
    if (style == null || width <= rightInset || height <= 0) return@LaunchedEffect

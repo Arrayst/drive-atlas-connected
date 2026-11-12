@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -121,6 +122,8 @@ class MainActivity : ComponentActivity() {
         var archiveDialog by remember { mutableStateOf(false) }
         var preview by remember { mutableStateOf<Bitmap?>(null) }
         val pageScroll = rememberScrollState()
+        // Keep unsaved journal inputs when safety removes the page, without retaining its UI.
+        val memoryPageState = rememberSaveableStateHolder()
         LaunchedEffect(page, selected.id) { pageScroll.scrollTo(0) }
         LaunchedEffect(engine.canEdit) { if (!engine.canEdit) { preview = null; navDialog = false; archiveDialog = false; debug = false } }
         BackHandler(enabled = preview != null || debug || page != "discover") {
@@ -154,7 +157,8 @@ class MainActivity : ComponentActivity() {
                                 onPreferences = { value -> var ok=false;act { ok=familyEngine.preferences(value, engine.safety) };ok },
                                 onPlan = { id, plan -> var ok=false;act { ok=familyEngine.plan(id, plan, engine.safety) };ok },
                                 onRoute = ::open, onMemory = { page = "family-memory" })
-                            "family-memory" -> FamilyMemoriesPage(familyEngine.snapshot,
+                            "family-memory" -> memoryPageState.SaveableStateProvider("family-memory") {
+                                FamilyMemoriesPage(familyEngine.snapshot,
                                 onSave = { id, route, rating, note, simulated, tripDate, feelings ->
                                     var saved = false
                                     act { saved = familyEngine.remember(id, route, rating, note, System.currentTimeMillis(), engine.safety, simulated, tripDate, feelings)
@@ -163,6 +167,7 @@ class MainActivity : ComponentActivity() {
                                 }, onCompare = { page = "family" },
                                 onEdit = { id, rating, note, tripDate, feelings -> var ok=false; act { ok=familyEngine.editMemory(id,rating,note,engine.safety,tripDate,feelings) };ok },
                                 onDelete = { id -> var ok=false;act { ok=familyEngine.deleteMemory(id,engine.safety) };ok }, currentTrip = engine.snapshot.trip)
+                            }
                             "discover" -> GuideHome(engine.snapshot, { curation = it; page = "curation" },
                                 onTrip = { page = "trip" }, onAtlas = { page = "atlas" }, onRoute = ::open, filters = filters)
                             "curation" -> CurationPage(curation, filters, engine.snapshot.awards, ::open, { page = "discover" })

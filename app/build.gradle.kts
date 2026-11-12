@@ -7,7 +7,7 @@ android {
  namespace = "com.driveatlas"
  compileSdk = 35
  useLibrary("android.car")
- defaultConfig { applicationId = "com.driveatlas.connected"; minSdk = 28; targetSdk = 35; versionCode = 9; versionName = "0.9.0-roundtrip" }
+ defaultConfig { applicationId = "com.driveatlas.connected"; minSdk = 28; targetSdk = 35; versionCode = 9; versionName = "0.9.0-roundtrip"; testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner" }
  buildTypes { debug { applicationIdSuffix = ".emulator"; buildConfigField("boolean", "SIMULATOR", "true") }; release { buildConfigField("boolean", "SIMULATOR", "false") } }
  compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
  kotlinOptions { jvmTarget = "17" }
