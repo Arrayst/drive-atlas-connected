@@ -28,7 +28,6 @@ import java.util.Date
 import java.util.Locale
 
 @Composable internal fun AutoEtaPage(snapshot:FamilySnapshot,onCurrentPoint:()->Point?,onCanCalculate:()->Boolean,onApply:(EtaEstimate)->Boolean,onFamily:()->Unit,onPrototype:(()->Unit)?=null) {
- if(BuildConfig.DEBUG&&BuildConfig.SIMULATOR&&onPrototype!=null)OutlinedButton(onClick=onPrototype,modifier=Modifier.heightIn(min=72.dp)){Text("앱 안에서 전체 경로 따라보기 · SIM",fontSize=20.sp)}
  val context=LocalContext.current;val cache=remember{EtaCache(context)};val scope=rememberCoroutineScope()
  var routeId by remember{mutableStateOf(Catalog.routes.first().id)}
  var originId by remember{mutableStateOf<String?>(DepartureReferences.all.first().id)}
@@ -59,6 +58,7 @@ import java.util.Locale
  }
  var editOrigin by remember { mutableStateOf(false) }
  var details by remember { mutableStateOf(false) }
+ var itineraryOpen by remember { mutableStateOf(false) }
  val route=Catalog.routes.first{it.id==routeId}
  TripHeading("왕복 도로 시간","출발부터 복귀까지 계산합니다. 휴식과 걷기는 가족 계획에서 따로 더하세요.")
  TripWorkspace(firstWeight=.36f,first={ pane ->
@@ -81,13 +81,13 @@ import java.util.Locale
      },Modifier.fillMaxWidth())
     }
    }
-   if(!busy)Column(verticalArrangement=Arrangement.spacedBy(4.dp)) {
+   if(!busy)Column(verticalArrangement=Arrangement.spacedBy(10.dp)) {
     Text("다녀올 코스",color=Ink,fontSize=22.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(vertical=12.dp))
     Catalog.routes.forEach { r ->
      val interaction=remember(r.id){MutableInteractionSource()}
      val focused by interaction.collectIsFocusedAsState()
-     Surface(onClick={routeId=r.id;reset()},color=if(r.id==routeId)Sage else androidx.compose.ui.graphics.Color.Transparent,
-      interactionSource=interaction,border=if(focused)BorderStroke(3.dp,Coral) else null,
+     Surface(onClick={routeId=r.id;reset()},color=if(r.id==routeId)AtlasSoft else White,
+      interactionSource=interaction,border=BorderStroke(if(focused)3.dp else 1.dp,if(focused||r.id==routeId)AtlasGreen else Line),
       shape=RoundedCornerShape(8.dp),modifier=Modifier.fillMaxWidth().heightIn(min=88.dp).semantics{selected=r.id==routeId;role=Role.RadioButton}) {
       Row(Modifier.padding(18.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(14.dp)) {
        TripSelectionMark(r.id==routeId)
@@ -97,7 +97,6 @@ import java.util.Locale
        }
       }
      }
-     HorizontalDivider(color=Line)
     }
    }
   }
@@ -106,11 +105,11 @@ import java.util.Locale
    Text(if(result!=null)"왕복 도로 예상" else "이번 왕복 여정",color=Muted,fontSize=20.sp)
    val v=result
    if(v!=null) {
-    Text(tripDuration(v.roadMinutes),fontSize=54.sp,fontWeight=FontWeight.Bold,color=Ink,letterSpacing=(-2).sp)
+    Text(tripDuration(v.roadMinutes),fontSize=44.sp,fontWeight=FontWeight.Bold,color=Ink,letterSpacing=(-2).sp)
     Text("${String.format(Locale.KOREA,"%.1f",v.meters/1000)} km · ${if(v.cached)"저장된 공개 결과" else "도로 기준 계산"}",fontSize=20.sp,color=Coral)
     Text("교통·신호·주차 제외 · 휴식과 걷기는 별도",fontSize=18.sp,color=Muted)
    } else {
-    Text("출발 → 코스 → 복귀",fontSize=34.sp,fontWeight=FontWeight.Bold,color=Ink)
+    Text("출발 → 코스 → 복귀",fontSize=30.sp,fontWeight=FontWeight.Bold,color=Ink)
     Text("편도 시간을 두 배로 하지 않고\n돌아오는 도로까지 계산해요.",fontSize=21.sp,lineHeight=32.sp,color=Muted)
    }
    HorizontalDivider(color=Line,modifier=Modifier.padding(vertical=10.dp))
@@ -120,11 +119,21 @@ import java.util.Locale
    EtaSegment("돌아오는 길",route.stops.last().name+" → "+originLabel,v?.returnMinutes)
    Text("선택한 경유 순서 기준 · 휴식지 이동은 해당 도로 구간에 포함",fontSize=17.sp,color=Muted)
    HorizontalDivider(color=Line)
-   Text("경유 순서",fontSize=21.sp,fontWeight=FontWeight.SemiBold,color=Ink)
+   Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+    Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(4.dp)) {
+     Text(route.title,fontSize=21.sp,fontWeight=FontWeight.SemiBold,color=Ink)
+     Text("코스 기준점 ${route.stops.size}곳 · 선택 휴식지 ${selectedRestIds.size}곳",fontSize=17.sp,color=Muted)
+    }
+    TextButton(onClick={itineraryOpen=!itineraryOpen},modifier=Modifier.heightIn(min=76.dp)) {
+     Text(if(itineraryOpen)"순서 접기" else "경유 순서",fontSize=18.sp)
+    }
+   }
+   if(itineraryOpen) {
    Text(RestItinerary.route(routeId,selectedRestIds,restSlots)?.stops?.joinToString(" → "){it.name}?:"좌표 확인 필요",fontSize=20.sp,lineHeight=30.sp,color=Ink)
    selectedRestIds.forEach { id -> RestFacilities.find(id,routeId)?.let { facility ->
     Text("${facility.name} · "+if(facility.point==null)"좌표 미확인 · 계산할 수 없음" else "공개 시설 좌표 · 차량 진입점 미검증",fontSize=18.sp,color=Muted)
    }}
+   }
    if(selectedRestIds.isNotEmpty())Text("가족 계획에서 지정한 코스 구간에 휴식지를 삽입합니다. 휴식·걷기·여유 시간은 도로 예상 시간에 포함하지 않습니다.",fontSize=18.sp,color=Muted)
    if(!busy)SecondaryButton("휴식 장소·순서 변경",onFamily,Modifier.fillMaxWidth())
    Spacer(Modifier.height(8.dp))
@@ -153,6 +162,7 @@ import java.util.Locale
   Text("실시간 교통 ETA가 아닌 도로 예상 시간입니다.",color=Muted,fontSize=18.sp,modifier=Modifier.weight(1f))
   TextButton(onClick={details=!details},modifier=Modifier.heightIn(min=76.dp)){Text(if(details)"계산 안내 접기" else "데이터·개인정보 안내",fontSize=18.sp)}
  }
+ if(BuildConfig.DEBUG&&BuildConfig.SIMULATOR&&onPrototype!=null)OutlinedButton(onClick=onPrototype,modifier=Modifier.heightIn(min=72.dp)){Text("앱 안에서 전체 경로 따라보기 · SIM",fontSize=20.sp)}
  if(details)TripPanel {
   Text("선택 좌표: ${String.format(Locale.US,"%.5f, %.5f",origin.lat,origin.lon)}",fontSize=18.sp,color=Ink)
   Text("공개 기준점은 건물·역 인근 위치이며 실제 차량 출입구가 아닙니다. 공개 기준점 결과만 24시간 캐시합니다.",color=Muted,fontSize=18.sp)
@@ -182,6 +192,6 @@ import java.util.Locale
    Text(label,fontSize=20.sp,fontWeight=FontWeight.SemiBold,color=Ink)
    Text(route,fontSize=18.sp,lineHeight=26.sp,color=Muted)
   }
-  Text(minutes?.let{tripDuration(it)}?:"계산 전",fontSize=24.sp,fontWeight=FontWeight.Bold,color=Ink)
+  Text(minutes?.let{tripDuration(it)}?:"계산 전",fontSize=22.sp,fontWeight=FontWeight.Bold,color=if(minutes==null)Muted else AtlasGreen)
  }
 }

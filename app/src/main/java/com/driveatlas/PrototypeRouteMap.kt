@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -26,6 +27,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlin.coroutines.coroutineContext
 import kotlin.math.*
+
+// Rendering only: original OSM tile bytes, cache, endpoints and attribution are unchanged.
+internal val NavigationTileFilter=ColorFilter.colorMatrix(ColorMatrix().apply{setToSaturation(.35f)})
+internal val NavigationRouteBlue=Color(0xFF1769F5)
+private val NavigationPassed=Color(0xFF8996A8)
 
 /** SIM-only camera. Loads only visible tiles, never a route corridor or offline region. */
 @Composable internal fun PrototypeRouteMap(route:NavPrototypeRoute,position:Point,modifier:Modifier=Modifier,replayDistance:Double?=null,showStatusLabel:Boolean=true,controlsEnabled:Boolean=true){
@@ -71,9 +77,16 @@ import kotlin.math.*
   val tiles=tileKeys.mapNotNull{cache[it]}
   val heading=if(replayDistance!=null)prototypeGeometryHeading(route.geometry,route.cumulative,displayedDistance) else null
   val pathOrigin=remember(route,viewport.zoom){worldPoint(route.geometry.first(),viewport.zoom)}
-  val routePath=remember(route,viewport.zoom){Path().apply{
-   route.geometry.forEachIndexed{i,p->val q=worldPoint(p,viewport.zoom);val x=(q.first-pathOrigin.first).toFloat();val y=(q.second-pathOrigin.second).toFloat();if(i==0)moveTo(x,y)else lineTo(x,y)}
-  }}
+  val projected=remember(route,viewport.zoom){route.geometry.map{p->val q=worldPoint(p,viewport.zoom);Offset((q.first-pathOrigin.first).toFloat(),(q.second-pathOrigin.second).toFloat())}}
+  val segment=navigationProgressSegment(route.cumulative,if(replayDistance!=null)displayedDistance else 0.0)
+  val splitPaths=remember(projected,segment){
+   fun path(from:Int,to:Int)=Path().apply{for(i in from..to){val p=projected[i];if(i==from)moveTo(p.x,p.y)else lineTo(p.x,p.y)}}
+   path(0,segment) to path(segment+1,projected.lastIndex)
+  }
+  val references=remember(route){navigationReferenceMarkers(route.request)}
+  val markerPixels=references.map{marker->val p=worldPoint(marker.point,viewport.zoom);NavigationMarkerPixel(marker,p.first-viewport.left,p.second-viewport.top)}
+  val clusters=clusterNavigationMarkers(markerPixels,with(d){56.dp.toPx().toDouble()})
+  val markerPaint=remember{android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply{textAlign=android.graphics.Paint.Align.CENTER;typeface=android.graphics.Typeface.DEFAULT_BOLD}}
   Canvas(Modifier.fillMaxSize().pointerInput(route,w,h){
    detectDragGestures { change,delta ->
     change.consume()
@@ -83,22 +96,58 @@ import kotlin.math.*
     }
    }
   }){
-   tiles.orEmpty().forEach{t->t.image?.let{drawImage(it,Offset((t.x*256-viewport.left).toFloat(),(t.y*256-viewport.top).toFloat()))}}
+   tiles.orEmpty().forEach{t->t.image?.let{drawImage(it,Offset((t.x*256-viewport.left).toFloat(),(t.y*256-viewport.top).toFloat()),colorFilter=NavigationTileFilter)}}
    if(tiles.orEmpty().any{it.image!=null}){
     fun pixel(p:Point):Offset{val q=worldPoint(p,viewport.zoom);return Offset((q.first-viewport.left).toFloat(),(q.second-viewport.top).toFloat())}
-    translate((pathOrigin.first-viewport.left).toFloat(),(pathOrigin.second-viewport.top).toFloat()){
-     drawPath(routePath,White,style=Stroke(10f));drawPath(routePath,Coral,style=Stroke(5f))
-    }
-    route.request.points().forEach{drawCircle(Ink,7f,pixel(it))}
     val current=pixel(displayed)
-    drawCircle(White,21f,current);drawCircle(Color(0xFF6A42C2),17f,current)
+    translate((pathOrigin.first-viewport.left).toFloat(),(pathOrigin.second-viewport.top).toFloat()){
+     val q=worldPoint(if(replayDistance!=null)displayed else route.geometry.first(),viewport.zoom)
+     val cursor=Offset((q.first-pathOrigin.first).toFloat(),(q.second-pathOrigin.second).toFloat())
+     fun strokePart(path:Path,a:Offset,b:Offset,color:Color,width:Float){
+      val stroke=Stroke(width,cap=StrokeCap.Round,join=StrokeJoin.Round)
+      drawPath(path,color,style=stroke);drawLine(color,a,b,width,StrokeCap.Round)
+     }
+     // Passed geometry is drawn first. Future return legs remain blue even on the same road.
+     if(replayDistance!=null){
+      strokePart(splitPaths.first,projected[segment],cursor,White,10.dp.toPx())
+      strokePart(splitPaths.first,projected[segment],cursor,NavigationPassed,5.dp.toPx())
+     }
+     strokePart(splitPaths.second,cursor,projected[segment+1],Ink.copy(alpha=.20f),16.dp.toPx())
+     strokePart(splitPaths.second,cursor,projected[segment+1],White,13.dp.toPx())
+     strokePart(splitPaths.second,cursor,projected[segment+1],NavigationRouteBlue,7.dp.toPx())
+    }
+    clusters.forEach{cluster->
+     val center=Offset(cluster.x.toFloat(),cluster.y.toFloat())
+     val radius=18.dp.toPx()
+     if(center.x in -radius..(size.width+radius)&&center.y in -radius..(size.height+radius)&&(center-current).getDistance()>56.dp.toPx()){
+      val marker=cluster.members.first().marker
+      val grouped=cluster.members.size>1
+      val fill=if(grouped)Ink else when(marker.kind){NavigationMarkerKind.DEPARTURE->Ink;NavigationMarkerKind.COURSE->White;NavigationMarkerKind.REST->Color(0xFF176B52)}
+      drawCircle(White,radius+3.dp.toPx(),center)
+      if(!grouped&&marker.kind==NavigationMarkerKind.REST){
+       drawRoundRect(fill,center-Offset(radius,radius),androidx.compose.ui.geometry.Size(radius*2,radius*2),androidx.compose.ui.geometry.CornerRadius(7.dp.toPx()))
+      }else if(!grouped&&marker.kind==NavigationMarkerKind.DEPARTURE){
+       val diamond=Path().apply{moveTo(center.x,center.y-radius);lineTo(center.x+radius,center.y);lineTo(center.x,center.y+radius);lineTo(center.x-radius,center.y);close()};drawPath(diamond,fill)
+      }else{drawCircle(fill,radius,center);if(!grouped)drawCircle(NavigationRouteBlue,radius,center,style=Stroke(2.dp.toPx()))}
+      markerPaint.color=(if(!grouped&&marker.kind==NavigationMarkerKind.COURSE)NavigationRouteBlue else White).toArgb()
+      markerPaint.textSize=15.sp.toPx()
+      val baseline=center.y-(markerPaint.fontMetrics.ascent+markerPaint.fontMetrics.descent)/2
+      drawIntoCanvas{it.nativeCanvas.drawText(if(grouped)"${cluster.members.size}" else marker.badge,center.x,baseline,markerPaint)}
+     }
+    }
+    drawCircle(Ink.copy(alpha=.12f),32.dp.toPx(),current+Offset(0f,3.dp.toPx()))
+    drawCircle(White,30.dp.toPx(),current)
     if(heading!=null)rotate(heading,current){
-     val arrow=Path().apply{moveTo(current.x,current.y-13f);lineTo(current.x+10f,current.y+10f);lineTo(current.x,current.y+5f);lineTo(current.x-10f,current.y+10f);close()}
-     drawPath(arrow,White)
+     val arrow=Path().apply{moveTo(current.x,current.y-25.dp.toPx());lineTo(current.x+20.dp.toPx(),current.y+19.dp.toPx());lineTo(current.x,current.y+10.dp.toPx());lineTo(current.x-20.dp.toPx(),current.y+19.dp.toPx());close()}
+     drawPath(arrow,NavigationRouteBlue)
+     drawLine(White,current+Offset(0f,-10.dp.toPx()),current+Offset(0f,4.dp.toPx()),3.dp.toPx(),StrokeCap.Round)
+    }else{
+     drawCircle(NavigationRouteBlue,18.dp.toPx(),current)
+     drawCircle(White,5.dp.toPx(),current)
     }
    }
   }
-  if(showStatusLabel)Surface(Modifier.align(Alignment.TopStart).padding(12.dp),color=White.copy(alpha=.96f),shape=Corner){Text("SIM · 보라색: 모의 위치\n${if(follow)"위치 따라가기 · 북쪽 위" else "지도 둘러보기 · 북쪽 위"}",Modifier.padding(12.dp),color=Ink,fontSize=16.sp)}
+  if(showStatusLabel)Surface(Modifier.align(Alignment.TopStart).padding(12.dp),color=White.copy(alpha=.96f),shape=Corner){Text("SIM · 파란 포인터: 모의 위치\n${if(follow)"위치 따라가기 · 북쪽 위" else "지도 둘러보기 · 북쪽 위"}",Modifier.padding(12.dp),color=Ink,fontSize=16.sp)}
   Surface(Modifier.align(Alignment.BottomEnd).padding(end=12.dp,bottom=if(showStatusLabel)66.dp else 250.dp),color=White,shape=Corner){Row{
    TextButton(onClick={if(latestControlsEnabled){follow=true;manual=null}},enabled=controlsEnabled,modifier=Modifier.heightIn(min=64.dp)){Text(if(follow)"✓ 따라가기" else "따라가기",fontSize=16.sp)}
    TextButton(onClick={if(latestControlsEnabled){follow=false;manual=prototypeViewport(route.geometry,w,h)}},enabled=controlsEnabled,modifier=Modifier.heightIn(min=64.dp)){Text("전체 경로",fontSize=16.sp)}
@@ -106,7 +155,7 @@ import kotlin.math.*
   if(!loaded||loading&&tiles.none{it.image!=null})Surface(Modifier.align(Alignment.Center),color=White,shape=Corner){Text("지도 불러오는 중…",Modifier.padding(20.dp),color=Ink)}
   else if(tiles.none{it.image!=null})Surface(Modifier.align(Alignment.Center).padding(30.dp),color=White,shape=Corner){Column(Modifier.padding(20.dp)){Text("지도를 불러오지 못했어요. 빈 지도에 경로를 그리지 않습니다.",color=Ink);TextButton(onClick={if(latestControlsEnabled)retry++},enabled=controlsEnabled,modifier=Modifier.heightIn(min=64.dp)){Text("다시 불러오기")}}}
   else if(!loading&&(tiles.size<tileKeys.size||tiles.any{it.image==null}))Surface(Modifier.align(Alignment.Center),color=White){Text("일부 지도 영역 불러오기 실패",Modifier.padding(12.dp),color=Ink)}
-  Surface(Modifier.align(Alignment.BottomStart).fillMaxWidth(),color=White.copy(alpha=.96f)){TextButton(onClick={if(latestControlsEnabled)openWeb(context,"https://www.openstreetmap.org/copyright")},enabled=controlsEnabled){Text("© OpenStreetMap contributors · OSRM 도로 경로 · 실시간 교통 미반영",fontSize=13.sp,color=Ink)}}
+  Surface(Modifier.align(Alignment.BottomStart).fillMaxWidth(),color=White.copy(alpha=.96f)){TextButton(onClick={if(latestControlsEnabled)openWeb(context,"https://www.openstreetmap.org/copyright")},enabled=controlsEnabled){Text("출: 출발·귀가 · 1–3: 코스 · 쉼: 선택 쉼터 · 진한 숫자: 지점 묶음\n© OpenStreetMap contributors · OSRM 도로 경로 · 실시간 교통 미반영",fontSize=13.sp,color=Ink)}}
  }
 }
 
@@ -136,9 +185,11 @@ internal fun prototypeViewport(points:List<Point>,width:Int,height:Int):MapViewp
    if(i==0)moveTo(x,y)else lineTo(x,y)
   }}}
   Canvas(Modifier.fillMaxSize()){
-   tiles.orEmpty().forEach{tile->tile.image?.let{drawImage(it,Offset((tile.x*256-view.left).toFloat(),(tile.y*256-view.top).toFloat()))}}
+   tiles.orEmpty().forEach{tile->tile.image?.let{drawImage(it,Offset((tile.x*256-view.left).toFloat(),(tile.y*256-view.top).toFloat()),colorFilter=NavigationTileFilter)}}
    if(tiles.orEmpty().any{it.image!=null}){
-    drawPath(path,White,style=Stroke(10f));drawPath(path,Coral,style=Stroke(5f))
+    drawPath(path,Ink.copy(alpha=.20f),style=Stroke(16.dp.toPx(),cap=StrokeCap.Round,join=StrokeJoin.Round))
+    drawPath(path,White,style=Stroke(13.dp.toPx(),cap=StrokeCap.Round,join=StrokeJoin.Round))
+    drawPath(path,NavigationRouteBlue,style=Stroke(7.dp.toPx(),cap=StrokeCap.Round,join=StrokeJoin.Round))
    }
   }
   if(tiles==null)Surface(Modifier.align(Alignment.Center),color=White,shape=Corner){Text("기본 코스 지도 불러오는 중…",Modifier.padding(20.dp),color=Ink)}

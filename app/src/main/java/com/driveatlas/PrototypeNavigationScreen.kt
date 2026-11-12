@@ -177,25 +177,25 @@ private class AndroidOfflinePreview(context:Context,val status:(String)->Unit){
   result=result,replay=replay,simulatedOffset=simulatedOffset,busy=busy,active=active,
   canRun=onCanRun(),validRequest=request.valid(),autoSpeech=autoSpeech,canContinuous=speech.supportsContinuous,
   error=error,speechStatus=speechStatus,hasTrip=hasTrip,onBack=onBack,onPage=onPage,onDebug=onDebug,
-  onDeparture={departureId=it},onCourse={routeId=it},
-  onCalculate={replay=replay.copy(running=false);stopSpeech();consent=true},
-  onToggleReplay={stopSpeech();replay=replay.copy(running=!replay.running)},
+  onDeparture={if(active&&onCanRun()&&!replay.running&&!busy)departureId=it},onCourse={if(active&&onCanRun()&&!replay.running&&!busy)routeId=it},
+  onCalculate={if(active&&onCanRun()&&!replay.running){stopSpeech();consent=true}},
+  onToggleReplay={if(active&&onCanRun()){stopSpeech();replay=replay.copy(running=!replay.running)}},
   onToggleSpeech={
    if(autoSpeech)stopSpeech() else if(active&&onCanRun()&&replay.running&&speech.supportsContinuous){
     speech.stop();cueScheduler.reset();autoSpeech=true;speechStatus="SIM 연속 음성 켜짐 · 기기 내 합성만 사용"
    }
   },
-  onOneShot={if(active&&onCanRun()&&!replay.running)speech.speak(result!!.snapshot(replay).nextInstruction)},
-  onReset={stopSpeech();error="";simulatedOffset=null;replay=NavReplayState()},
+  onOneShot={if(active&&onCanRun()&&!replay.running)result?.let{speech.speak(it.snapshot(replay).nextInstruction)}},
+  onReset={if(active&&onCanRun()&&!replay.running){stopSpeech();error="";simulatedOffset=null;replay=NavReplayState()}},
   onOffRoute={
-   result?.let { r ->
+   if(active&&onCanRun()&&!replay.running)result?.let { r ->
     stopSpeech();val view=r.snapshot(replay);val offset=Point(view.position.lat+.02,view.position.lon+.02)
     val deviation=r.offRouteDistance(offset,replay);simulatedOffset=offset
     replay=replay.copy(running=false,offRoute=deviation>100)
     error="공개 경로의 가상 위치를 이동한 탐지 시연: 경로와 약 ${deviation.toInt()}m 차이. 자동 재탐색은 미지원입니다. 처음부터 재생하거나 전체 경로를 다시 요청하세요."
    }
   },
-  onClear={stopSpeech();error="";simulatedOffset=null;replay=NavReplayState();result=null}
+  onClear={if(active&&onCanRun()&&!replay.running){stopSpeech();error="";simulatedOffset=null;replay=NavReplayState();result=null}}
  )
  if(consent&&request.valid())AlertDialog(onDismissRequest={consent=false},title={Text("공개 좌표로 시연 경로를 요청할까요?")},text={Column(Modifier.heightIn(max=400.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(10.dp)){
   Text("받는 곳: router.project-osrm.org OSRM 공개 서버. 요청은 서버에 기록될 수 있습니다. 실제 집 주소·현재 GPS·가족 메모는 보내지 않습니다.")

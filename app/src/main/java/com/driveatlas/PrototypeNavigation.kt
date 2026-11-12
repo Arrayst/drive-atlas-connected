@@ -20,10 +20,10 @@ internal fun navPrototypeUrl(request:NavPrototypeRequest):String {
  val coords=points.joinToString(";"){String.format(Locale.US,"%.6f,%.6f",it.lon,it.lat)}
  return "https://router.project-osrm.org/route/v1/driving/$coords?overview=full&geometries=geojson&steps=true&alternatives=false&generate_hints=false&continue_straight=false&radiuses="+points.joinToString(";"){"500"}
 }
-internal data class NavPrototypeStep(val instruction:String,val startMeters:Double,val legIndex:Int,val type:String)
+internal data class NavPrototypeStep(val instruction:String,val startMeters:Double,val legIndex:Int,val type:String,val modifier:String?=null)
 internal data class NavReplayState(val distanceMeters:Double=0.0,val running:Boolean=false,val offRoute:Boolean=false)
 internal data class NavReplaySnapshot(val position:Point,val remainingMeters:Double,val nextInstruction:String,
- val metersToInstruction:Double,val stepIndex:Int,val finished:Boolean)
+ val metersToInstruction:Double,val stepIndex:Int,val finished:Boolean,val maneuver:NavManeuverIcon=NavManeuverIcon.UNKNOWN)
 internal data class NavPrototypeRoute(val request:NavPrototypeRequest,val geometry:List<Point>,val steps:List<NavPrototypeStep>,
  val meters:Double,val seconds:Double,val legEndMeters:List<Double>) {
  internal val cumulative:List<Double> = geometry.runningFoldIndexed(0.0){i,sum,p->sum+if(i==0)0.0 else navDistance(geometry[i-1],p)}.drop(1)
@@ -38,7 +38,8 @@ internal data class NavPrototypeRoute(val request:NavPrototypeRequest,val geomet
   val next=if(finished)steps.lastIndex else steps.indexOfFirst{it.startMeters>distance+0.1}.let{if(it<0)steps.lastIndex else it}
   return NavReplaySnapshot(positionAt(distance),((geometryMeters-distance)/geometryMeters*meters).coerceAtLeast(0.0),
    if(finished)"출발 기준점으로 돌아왔어요 · 시연 종료" else if(state.offRoute)"시연 위치가 경로를 벗어났어요 · 재생 일시정지" else steps[next].instruction,
-   (steps[next].startMeters-distance).coerceAtLeast(0.0),next,finished)
+   (steps[next].startMeters-distance).coerceAtLeast(0.0),next,finished,
+   if(state.offRoute)NavManeuverIcon.UNKNOWN else navManeuverIcon(steps[next].type,steps[next].modifier))
  }
  /** Searches only the replay's local progress window; outbound/return overlaps cannot jump progress. */
  fun offRouteDistance(point:Point,state:NavReplayState):Double {
@@ -109,7 +110,8 @@ internal fun parseNavPrototype(request:NavPrototypeRequest,body:String):NavProto
     if((s==0&&type!="depart")||(s==rawSteps.length()-1&&type!="arrive"))throw EtaUnavailable("InvalidResponse")
     if(navDistance(navCoordinate(maneuver.getJSONArray("location")),points.first())>5)throw EtaUnavailable("InvalidResponse")
     if(geometry.isNotEmpty()&&navDistance(geometry.last(),points.first())>5)throw EtaUnavailable("InvalidResponse")
-    steps+=NavPrototypeStep(navInstruction(type,maneuver.optString("modifier").takeIf{it.isNotBlank()},step.optString("name"),l,legs.length()-1),distance,l,type)
+    val modifier=if(maneuver.isNull("modifier"))null else maneuver.optString("modifier").takeIf{it.isNotBlank()}
+    steps+=NavPrototypeStep(navInstruction(type,maneuver.optString("modifier").takeIf{it.isNotBlank()},step.optString("name"),l,legs.length()-1),distance,l,type,modifier)
     points.forEach { p -> if(geometry.isEmpty())geometry+=p else if(p!=geometry.last()){distance+=navDistance(geometry.last(),p);geometry+=p};if(geometry.size>100000)throw EtaUnavailable("InvalidResponse") }
    }
    val expectedEnd=navCoordinate(snapped.getJSONObject(l+1).getJSONArray("location"))

@@ -75,7 +75,7 @@ internal fun directionsUrl(route:Route):String {
 }
 internal fun regionFor(route:Route)=when(route.id){"coast"->"강릉";"forest"->"담양";else->"춘천"}
 @Composable internal fun RoadStats(route:Route){val c=LocalContext.current;val r=remember(route.id){readRoad(c,route.id)};Text(String.format(Locale.KOREA,"%.1f km · 주행 약 %.0f분",r.meters/1000,r.seconds/60),fontSize=22.sp,fontWeight=FontWeight.Bold,color=Ink);Text("OSRM 추정 · 정차·교통상황 제외",fontSize=13.sp,color=Muted)}
-@Composable internal fun PhotoAttribution(route:Route){val c=LocalContext.current;val p=photoCredit(route);Text(p.caption,fontSize=13.sp,color=Muted);TextButton(onClick={openWeb(c,p.source)},contentPadding=PaddingValues(0.dp)){Text("사진: ${p.author} · ${p.license} ↗",fontSize=12.sp)}}
+@Composable internal fun PhotoAttribution(route:Route){val c=LocalContext.current;val p=photoCredit(route);Text(p.caption,fontSize=13.sp,color=Muted);TextButton(onClick={openWeb(c,p.source)},contentPadding=PaddingValues(0.dp),modifier=Modifier.heightIn(min=64.dp)){Text("사진: ${p.author} · ${p.license} ↗",fontSize=12.sp)}}
 @Composable internal fun RealNavigationDialog(route:Route,nativeStatus:String,onNativeSearch:()->Unit,onNativeRoute:()->Unit,onNativeOpen:()->Unit,onNativeLeg:(Int)->Unit,onDismiss:()->Unit,onStart:()->Unit){
  val context=LocalContext.current
  var advanced by remember(route.id){mutableStateOf(false)}
@@ -90,7 +90,7 @@ internal fun regionFor(route:Route)=when(route.id){"coast"->"강릉";"forest"->"
    onDispose { if(previous!=null) window?.setDimAmount(previous) }
   }
   Surface(Modifier.padding(24.dp).widthIn(max=760.dp).fillMaxWidth().heightIn(max=780.dp),color=White,
-   shape=androidx.compose.foundation.shape.RoundedCornerShape(28.dp),shadowElevation=28.dp){
+   shape=androidx.compose.foundation.shape.RoundedCornerShape(20.dp),shadowElevation=16.dp){
    Column {
     Row(Modifier.fillMaxWidth().padding(start=28.dp,end=16.dp,top=18.dp,bottom=18.dp),verticalAlignment=Alignment.CenterVertically){
      Column(Modifier.weight(1f)){
@@ -103,7 +103,7 @@ internal fun regionFor(route:Route)=when(route.id){"coast"->"강릉";"forest"->"
     }
     HorizontalDivider(color=Line)
     Column(Modifier.weight(1f,fill=false).verticalScroll(rememberScrollState()).padding(28.dp),verticalArrangement=Arrangement.spacedBy(18.dp)){
-     Surface(color=if(status.confirmed) androidx.compose.ui.graphics.Color(0xFFEAF5EF) else Paper,shape=androidx.compose.foundation.shape.RoundedCornerShape(18.dp)){
+     Surface(color=if(status.confirmed) AtlasSoft else Paper,shape=androidx.compose.foundation.shape.RoundedCornerShape(12.dp)){
       Column(Modifier.fillMaxWidth().padding(20.dp)){
        Text(status.title,fontSize=21.sp,fontWeight=FontWeight.Bold,color=Ink)
        Text(nativeStatus,fontSize=17.sp,lineHeight=25.sp,color=Muted,modifier=Modifier.padding(top=8.dp)

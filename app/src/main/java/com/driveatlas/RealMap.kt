@@ -7,6 +7,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -24,6 +25,7 @@ import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -62,6 +64,7 @@ internal suspend fun loadVisibleTiles(context:Context,v:MapViewport):List<MapTil
  }
  HttpResponseCache.getInstalled()?.let { it.flush(); android.util.Log.i("DriveAtlasMap", "visible=${result.size} loaded=${result.count { t -> t.image!=null }} network=${it.networkCount} cacheHits=${it.hitCount}") };result
 }
+@OptIn(ExperimentalLayoutApi::class)
 @Composable internal fun RealRoadMap(route:Route,modifier:Modifier=Modifier) {
  val context=LocalContext.current
  val road=remember(route.id){readRoad(context,route.id)}
@@ -72,13 +75,15 @@ internal suspend fun loadVisibleTiles(context:Context,v:MapViewport):List<MapTil
  var listOpen by remember(route.id){mutableStateOf(false)}
  val shown=visibleMapPlaces(places,filter)
  var zoom by remember(route.id){mutableIntStateOf(0)}
+ var zoomMenu by remember(route.id){mutableStateOf(false)}
  var failedMode by remember(route.id){mutableStateOf(false)}
  var refresh by remember(route.id){mutableIntStateOf(0)}
  BoxWithConstraints(modifier.clipToBounds().background(Sage)){
   val density=androidx.compose.ui.platform.LocalDensity.current
   val w=with(density){maxWidth.roundToPx()};val h=with(density){maxHeight.roundToPx()}
-  val insetTop=with(density){112.dp.roundToPx()};val insetBottom=with(density){106.dp.roundToPx()}
-  val v=remember(route.id,w,h,zoom){
+  var insetTop by remember(w,density.fontScale){mutableIntStateOf(with(density){144.dp.roundToPx()})}
+  var insetBottom by remember(w,density.fontScale){mutableIntStateOf(with(density){if(maxWidth<600.dp)192.dp.roundToPx() else 128.dp.roundToPx()})}
+  val v=remember(route.id,w,h,zoom,insetTop,insetBottom){
    val fit=fittedViewport(road.points+places.map{it.point},w,(h-insetTop-insetBottom).coerceAtLeast(90),zoom)
    fit.copy(top=fit.top-insetTop,height=h)
   }
@@ -86,54 +91,66 @@ internal suspend fun loadVisibleTiles(context:Context,v:MapViewport):List<MapTil
   LaunchedEffect(route.id,v,failedMode,refresh){tiles=if(failedMode) emptyList() else loadVisibleTiles(context,v)}
   val pinSize=64.dp
   val half=with(density){pinSize.toPx()/2}
+  val gap=with(density){8.dp.toPx()}
+  val pinRange=mapPinVerticalRange(h.toFloat(),insetTop.toFloat(),insetBottom.toFloat(),half,gap)
+  val zoomColumnFits=h-insetBottom>=with(density){264.dp.roundToPx()}
   val anchors=shown.map { val xy=worldPoint(it.point,v.zoom);MapPinPosition((xy.first-v.left).toFloat(),(xy.second-v.top).toFloat()) }
-  val pinPositions=separateMapPins(anchors,half+8,insetTop+half,(w-half-92).coerceAtLeast(half+8),(h-insetBottom-half).coerceAtLeast(insetTop+half),half*2+8)
+  val pinPositions=if(pinRange!=null)separateMapPins(anchors,half+gap,pinRange.first,(w-half-with(density){104.dp.toPx()}).coerceAtLeast(half+gap),pinRange.second,half*2+gap) else emptyList()
   Canvas(Modifier.fillMaxSize()){
-   tiles.orEmpty().forEach{t->t.image?.let{drawImage(it,Offset((t.x*256-v.left).toFloat(),(t.y*256-v.top).toFloat()))}}
+   tiles.orEmpty().forEach{t->t.image?.let{drawImage(it,Offset((t.x*256-v.left).toFloat(),(t.y*256-v.top).toFloat()),colorFilter=NavigationTileFilter)}}
    if(tiles.orEmpty().any{it.image!=null}){
     val path=Path();road.points.forEachIndexed{i,p->val xy=worldPoint(p,v.zoom);val x=(xy.first-v.left).toFloat();val y=(xy.second-v.top).toFloat();if(i==0)path.moveTo(x,y)else path.lineTo(x,y)}
-    drawPath(path,Color.White,style=Stroke(width=11f,cap=StrokeCap.Round,join=StrokeJoin.Round));drawPath(path,Coral,style=Stroke(width=6f,cap=StrokeCap.Round,join=StrokeJoin.Round))
-    anchors.forEachIndexed { i,a -> val pin=pinPositions[i];drawLine(Color.White,Offset(a.x,a.y),Offset(pin.x,pin.y),6f);drawLine(Ink,Offset(a.x,a.y),Offset(pin.x,pin.y),2f);drawCircle(Ink,4f,Offset(a.x,a.y)) }
+    drawPath(path,Color.White,style=Stroke(width=13.dp.toPx(),cap=StrokeCap.Round,join=StrokeJoin.Round));drawPath(path,NavigationRouteBlue,style=Stroke(width=7.dp.toPx(),cap=StrokeCap.Round,join=StrokeJoin.Round))
+    if(pinRange!=null)anchors.forEachIndexed { i,a -> val pin=pinPositions[i];drawLine(Color.White,Offset(a.x,a.y),Offset(pin.x,pin.y),6f);drawLine(Ink,Offset(a.x,a.y),Offset(pin.x,pin.y),2f);drawCircle(Ink,4f,Offset(a.x,a.y)) }
 
 
    }
   }
-  if(tiles.orEmpty().any{it.image!=null}) shown.forEachIndexed { index,place ->
+  if(pinRange!=null&&tiles.orEmpty().any{it.image!=null}) shown.forEachIndexed { index,place ->
    val px=pinPositions[index].x;val py=pinPositions[index].y
    if(px in half..(w-half)&&py in half..(h-half)) {
     Button(onClick={selected=place},modifier=Modifier.offset{IntOffset((px-half).roundToInt(),(py-half).roundToInt())}.size(pinSize)
      .semantics { contentDescription=place.name+if(place.selectedRest)" · 가족 계획에 선택됨" else " · 장소 정보" },
-     shape=CircleShape,contentPadding=PaddingValues(0.dp),
-     colors=ButtonDefaults.buttonColors(containerColor=when {MapPlaceKind.PHOTO in place.kinds->Color(0xFF6A42C2);MapPlaceKind.REST in place.kinds->Color(0xFF176B52);else->Ink}),
+     shape=if(MapPlaceKind.REST in place.kinds)RoundedCornerShape(16.dp) else CircleShape,contentPadding=PaddingValues(0.dp),
+     colors=ButtonDefaults.buttonColors(containerColor=when {MapPlaceKind.PHOTO in place.kinds->Color(0xFF6A42C2);MapPlaceKind.REST in place.kinds->Color(0xFF176B52);else->NavigationRouteBlue}),
      border=androidx.compose.foundation.BorderStroke(if(place.selectedRest)4.dp else 2.dp,Color.White)) {
       Text(if(MapPlaceKind.PHOTO in place.kinds)"사진" else place.badge,fontSize=24.sp,fontWeight=FontWeight.Bold)
     }
    }
   }
-  Surface(Modifier.align(Alignment.TopStart).padding(12.dp).padding(end=90.dp),color=White.copy(alpha=.97f),shape=Corner){Column(Modifier.padding(horizontal=12.dp,vertical=8.dp)){
+  Surface(Modifier.align(Alignment.TopStart).onSizeChanged{insetTop=it.height}.padding(12.dp).padding(end=90.dp),color=White.copy(alpha=.97f),shape=Corner){Column(Modifier.padding(horizontal=12.dp,vertical=8.dp)){
    Text("코스와 쉬어 갈 곳",fontSize=17.sp,color=Ink,fontWeight=FontWeight.Bold)
-   Text("파란 선: 코스 · 핀 연결점: 대표 위치",fontSize=12.sp,color=Muted)
-   TextButton(onClick={listOpen=true},contentPadding=PaddingValues(0.dp),modifier=Modifier.heightIn(min=48.dp)){Text("${filter?.label?:"전체"} ${shown.size}곳 · 목록",fontSize=15.sp)}
+   Text(if(pinRange==null&&shown.isNotEmpty())"작은 지도 · 장소는 목록에서 확인" else "파란 선: 코스 · 핀 연결점: 대표 위치",fontSize=16.sp,color=Muted,minLines=2,maxLines=2)
+   TextButton(onClick={listOpen=true},contentPadding=PaddingValues(0.dp),modifier=Modifier.heightIn(min=64.dp)){Text("${filter?.label?:"전체"} ${shown.size}곳 · 목록",fontSize=16.sp)}
   }}
   Column(Modifier.align(Alignment.TopEnd).padding(12.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){
-   FilledTonalButton(onClick={zoom=(zoom+1).coerceAtMost(2)},enabled=zoom<2,contentPadding=PaddingValues(0.dp),modifier=Modifier.size(76.dp)){Text("+",fontSize=27.sp)}
-   FilledTonalButton(onClick={zoom=(zoom-1).coerceAtLeast(-2)},enabled=zoom> -2,contentPadding=PaddingValues(0.dp),modifier=Modifier.size(76.dp)){Text("−",fontSize=27.sp)}
-   FilledTonalButton(onClick={zoom=0},contentPadding=PaddingValues(0.dp),modifier=Modifier.size(76.dp)){Text("전체",fontSize=18.sp)}
+   if(!zoomColumnFits) {
+    FilledTonalButton(shape=RoundedCornerShape(16.dp),onClick={zoomMenu=true},contentPadding=PaddingValues(0.dp),modifier=Modifier.size(76.dp)){Text("배율",fontSize=18.sp)}
+    DropdownMenu(expanded=zoomMenu,onDismissRequest={zoomMenu=false}) {
+     DropdownMenuItem(text={Text("확대 +",fontSize=18.sp)},onClick={zoom=(zoom+1).coerceAtMost(2);zoomMenu=false},enabled=zoom<2,modifier=Modifier.heightIn(min=64.dp))
+     DropdownMenuItem(text={Text("축소 −",fontSize=18.sp)},onClick={zoom=(zoom-1).coerceAtLeast(-2);zoomMenu=false},enabled=zoom> -2,modifier=Modifier.heightIn(min=64.dp))
+     DropdownMenuItem(text={Text("전체 경로",fontSize=18.sp)},onClick={zoom=0;zoomMenu=false},modifier=Modifier.heightIn(min=64.dp))
+    }
+   } else {
+   FilledTonalButton(shape=RoundedCornerShape(16.dp),onClick={zoom=(zoom+1).coerceAtMost(2)},enabled=zoom<2,contentPadding=PaddingValues(0.dp),modifier=Modifier.size(76.dp)){Text("+",fontSize=27.sp)}
+   FilledTonalButton(shape=RoundedCornerShape(16.dp),onClick={zoom=(zoom-1).coerceAtLeast(-2)},enabled=zoom> -2,contentPadding=PaddingValues(0.dp),modifier=Modifier.size(76.dp)){Text("−",fontSize=27.sp)}
+   FilledTonalButton(shape=RoundedCornerShape(16.dp),onClick={zoom=0},contentPadding=PaddingValues(0.dp),modifier=Modifier.size(76.dp)){Text("전체",fontSize=18.sp)}
+   }
   }
   if(tiles==null)Surface(Modifier.align(Alignment.Center),color=White,shape=Corner){Text("실제 지도를 불러오는 중…",Modifier.padding(20.dp),color=Ink)}
-  else if(tiles.orEmpty().none{it.image!=null})Surface(Modifier.align(Alignment.Center).padding(70.dp),color=White,shape=Corner){Column(Modifier.padding(24.dp)){Text(if(failedMode)"오프라인 상황 체험" else "지도를 불러오지 못했어요",fontSize=20.sp,color=Ink);Text("인터넷 연결이 필요해요. 경로를 빈 지도 위에 그리지 않습니다.",fontSize=15.sp,color=Muted);TextButton(onClick={failedMode=false;refresh++}){Text("다시 불러오기")}}}
+  else if(tiles.orEmpty().none{it.image!=null})Surface(Modifier.align(Alignment.Center).padding(70.dp),color=White,shape=Corner){Column(Modifier.padding(24.dp)){Text(if(failedMode)"오프라인 상황 체험" else "지도를 불러오지 못했어요",fontSize=20.sp,color=Ink);Text("인터넷 연결이 필요해요. 경로를 빈 지도 위에 그리지 않습니다.",fontSize=16.sp,color=Muted);TextButton(onClick={failedMode=false;refresh++},modifier=Modifier.heightIn(min=64.dp)){Text("다시 불러오기")}}}
   else if(tiles.orEmpty().any{it.image==null})Surface(Modifier.align(Alignment.Center),color=White){Text("일부 지도 영역을 불러오지 못했어요",Modifier.padding(12.dp),color=Ink)}
-  Column(Modifier.align(Alignment.BottomStart).fillMaxWidth().background(White.copy(alpha=.97f))){
+  Column(Modifier.align(Alignment.BottomStart).onSizeChanged{insetBottom=it.height}.fillMaxWidth().background(White.copy(alpha=.97f))){
    Row(Modifier.fillMaxWidth().padding(horizontal=8.dp),horizontalArrangement=Arrangement.spacedBy(4.dp)) {
     listOf<MapPlaceKind?>(null,MapPlaceKind.COURSE,MapPlaceKind.REST,MapPlaceKind.PHOTO).forEach { kind ->
-     TextButton(onClick={filter=kind},modifier=Modifier.weight(1f).heightIn(min=48.dp),contentPadding=PaddingValues(2.dp),
-      colors=ButtonDefaults.textButtonColors(contentColor=if(filter==kind)Coral else Muted)) { Text(kind?.label?:"전체",fontSize=14.sp,fontWeight=if(filter==kind)FontWeight.Bold else FontWeight.Normal) }
+     TextButton(onClick={filter=kind},modifier=Modifier.weight(1f).heightIn(min=64.dp),contentPadding=PaddingValues(2.dp),
+      colors=ButtonDefaults.textButtonColors(contentColor=if(filter==kind)Coral else Muted)) { Text(kind?.label?:"전체",fontSize=16.sp,fontWeight=if(filter==kind)FontWeight.Bold else FontWeight.Normal) }
     }
    }
-   if(shown.isEmpty())Text("이 코스에는 출처를 확인한 사진 산책 장소가 아직 없어요.",fontSize=12.sp,color=Muted,modifier=Modifier.padding(horizontal=12.dp))
-   Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween){
-    if(BuildConfig.SIMULATOR)TextButton(onClick={failedMode=!failedMode}){Text(if(failedMode)"온라인으로" else "오프라인 체험",fontSize=12.sp)}
-    TextButton(onClick={openWeb(context,"https://www.openstreetmap.org/copyright")}){Text("© OpenStreetMap contributors",fontSize=12.sp,color=Ink)}
+   if(shown.isEmpty())Text("이 코스에는 출처를 확인한 사진 산책 장소가 아직 없어요.",fontSize=16.sp,color=Muted,modifier=Modifier.padding(horizontal=12.dp))
+   FlowRow(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){
+    if(BuildConfig.SIMULATOR)TextButton(onClick={failedMode=!failedMode},modifier=Modifier.heightIn(min=64.dp)){Text(if(failedMode)"온라인으로" else "오프라인 체험",fontSize=16.sp)}
+    TextButton(onClick={openWeb(context,"https://www.openstreetmap.org/copyright")},modifier=Modifier.heightIn(min=64.dp)){Text("© OpenStreetMap contributors",fontSize=16.sp,color=Ink)}
    }
   }
  }
@@ -156,13 +173,13 @@ internal suspend fun loadVisibleTiles(context:Context,v:MapViewport):List<MapTil
      Text("도로 기준점에서는 정차·촬영하지 마세요. 안전하게 주차한 뒤 장소 정보를 확인하세요.",color=Muted,fontSize=17.sp)
      places.forEach { place ->
       OutlinedButton(onClick={onSelect(place)},modifier=Modifier.fillMaxWidth().heightIn(min=76.dp),shape=Corner,contentPadding=PaddingValues(16.dp)){
-       Column(Modifier.fillMaxWidth()) {Text(place.name,fontSize=19.sp,color=Ink);Text(place.kinds.joinToString(" · "){it.label}+if(place.selectedRest)" · 가족 계획에 선택됨" else "",fontSize=14.sp,color=Muted)}
+       Column(Modifier.fillMaxWidth()) {Text(place.name,fontSize=19.sp,color=Ink);Text(place.kinds.joinToString(" · "){it.label}+if(place.selectedRest)" · 가족 계획에 선택됨" else "",fontSize=16.sp,color=Muted)}
       }
      }
     } else {
      Text(selected.kinds.joinToString(" · "){it.label}+if(selected.selectedRest)" · 가족 계획에 선택됨" else "",color=Coral,fontSize=17.sp)
      Text(selected.description,fontSize=19.sp,lineHeight=29.sp,color=Ink)
-     Text("사진 장소 선택은 경로·휴식 시간을 자동 변경하지 않습니다. 휴식 계획은 가족 비교에서 편집하세요.",fontSize=15.sp,color=Muted)
+     Text("사진 장소 선택은 경로·휴식 시간을 자동 변경하지 않습니다. 휴식 계획은 가족 비교에서 편집하세요.",fontSize=16.sp,color=Muted)
      selected.source?.let { source -> OutlinedButton(onClick={openWeb(context,source)},modifier=Modifier.fillMaxWidth().heightIn(min=64.dp)){Text("공식 안내 확인 ↗",fontSize=18.sp)} }
      TextButton(onClick=onBack,modifier=Modifier.heightIn(min=64.dp)){Text("← 장소 목록",fontSize=18.sp)}
     }
