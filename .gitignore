@@ -28,3 +28,20 @@ evidence/nav-prototype-v12/
 
 # Local speech QA captures and device logs
 evidence/nav-voice-v12/
+
+# Local submission/review evidence (may contain private fixture data and logs)
+evidence/design-refinement-20261113/
+evidence/shortform-final/
+evidence/show-app-85843bb/
+evidence/submission-map-open-20261114/
+evidence/submission-release-20261114/
+
+# Signing material stays outside the repository
+*.jks
+*.keystore
+*.p12
+*.pfx
+keystore.properties
+signing.properties
+*.key
+*.pem

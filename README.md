@@ -2,6 +2,30 @@
 
 Native Kotlin/Compose Android app for the Hyundai PLEOS emulator: family conditions → course and rest planning → navigation handoff → family-car memories and feedback → next recommendation.
 
+## Competition submission · 2026-11-14
+
+- App: **DRIVE ATLAS**; team: **SELTO SPOT**.
+- Competition release: [`apk/SELTO SPOT_DRIVE ATLAS_release.apk`](apk/SELTO%20SPOT_DRIVE%20ATLAS_release.apk). Spaces are intentional; quote the path in shell commands.
+- Application ID: `com.driveatlas.connected`; version `0.9.0-roundtrip` (code `9`); min SDK `28`, target SDK `35`.
+- This is the **release** build (`DEBUG=false`, `SIMULATOR=false`), signed with the team's dedicated submission key. It is not the debug/design-review app and does not enable debug-only SIM replay or the prototype public OSRM ETA provider.
+- APK SHA-256: `f23adf9035c5c84272b9db50ee89b6bc3a8fde75ab515d757e86cb6647dba910`.
+- Certificate SHA-256: `b101e063524dd69eef74bd741bbd0fe8edff4880af9b61030cd6d909eca47827` (public certificate fingerprint, not a private key).
+- Verified emulator: **Pleos Connect 2.1.0** (`release_connect_v2.1.0`), **Android 14 / API 34**, **2560 × 1440 at 160 dpi**. Use an existing authorized Pleos emulator; its image is not redistributed.
+- Validation: debug and release each passed 293 unit tests; both lint runs had zero errors. The signed APK installed, opened its real map, passed the bounded course/family/memory/Back smoke and reopened successfully. See the report for warnings and untested cases.
+- Build and runtime validation, remaining limits and source-reference instructions: [submission verification](docs/SUBMISSION_20261114.md).
+
+Install only on an authorized PLEOS test emulator/device with the required services:
+
+```sh
+adb devices -l
+adb -s <selected-emulator-serial> install -r "apk/SELTO SPOT_DRIVE ATLAS_release.apk"
+adb -s <selected-emulator-serial> shell am start -n com.driveatlas.connected/com.driveatlas.MainActivity
+```
+
+A conflicting existing signature must be resolved deliberately; do not uninstall or erase user data to bypass it. Actual parked `P` and platform UX authorization are required. Missing/unsafe vehicle signals keep the app locked. Do not force permissions or simulate vehicle state to defeat this gate.
+
+The course map is optional and starts behind explicit connection consent. Opening it sends public course-region requests and the device's IP address to OpenFreeMap/Cloudflare, and remembers consent on that installation. It does not require transmitting current GPS, a home address or family records. See [OpenFreeMap terms](https://openfreemap.org/tos/) and [privacy](https://openfreemap.org/privacy/). Location, external navigation and online road-time requests have separate checks. Release users can enter planning estimates manually; this package does not claim live traffic or a production ETA provider.
+
 ## Implemented
 
 - Consent-gated road-based round trips: departure → all course stops → departure, with independent outbound/course/return legs, explicit family-plan application and public-reference-only 24-hour cache.
@@ -27,7 +51,7 @@ bash ./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:ass
 Offline mode works only after required dependencies have been cached. The Android Studio bundled JDK 25 is not compatible with this project's current Gradle 8.10.2 setup.
 
 - Debug: `app/build/outputs/apk/debug/app-debug.apk`
-- Release: `app/build/outputs/apk/release/app-release-unsigned.apk` (unsigned, not a store-ready release)
+- Build output: `app/build/outputs/apk/release/app-release-unsigned.apk` (unsigned intermediate). The reviewed, signed competition package is under `apk/`; signing keys and passwords are never included. Rebuilding the source does not grant access to the submission key.
 - Debug application ID: `com.driveatlas.connected.emulator`
 
 Use an existing authorized PLEOS emulator; proprietary emulator images and SDK-source archives are not included in this repository. Do not bypass permissions or vehicle restrictions to run the app.
@@ -48,10 +72,12 @@ Tests cover safety, location evidence, restore validation, ranking, scoped facil
 - Emulator GPS or navigation is not physical driving or proof of a visit.
 - No cloud accounts, payments, partner contracts, production signing, store publication or physical-vehicle certification is claimed.
 
+Latest visual refinement and validation: [2026-11-13 screen refinement](docs/DESIGN_REFINEMENT_20261113.md).
+
 Design rationale and source adaptation: [Native atlas workbench](docs/NATIVE_ATLAS_DESIGN.md).
 
 Details and test results: [Round trip 0.9](docs/ROUNDTRIP_V09.md), [vehicle/release readiness](docs/VEHICLE_RELEASE_READINESS.md), [Family 0.8](docs/FAMILY_V08.md), [native-provider investigation](docs/NATIVE_NAVIGATION_V08.md), [prior connected integration](docs/PLEOS_CONNECTED_V05.md).
 
 ## Data and licenses
 
-Family data stays in private local app storage; Android backup is disabled. Public photos retain their individual attribution/license links in the app and `docs/REAL_ROADS_V04.md`. Map/source attribution and service limitations are documented there. Build outputs, signing keys, local configuration, SDK-source archives and new raw verification captures are excluded from source publication.
+Family data stays in private local app storage; Android backup is disabled. Public photos retain their individual attribution/license links in the app and `docs/REAL_ROADS_V04.md`. Map/source attribution and service limitations are documented there. Intermediate build outputs, signing keys, local configuration, SDK-source archives and raw verification captures are excluded from source publication. The explicitly reviewed, signed competition APK under `apk/` is the sole build-artifact exception.

@@ -124,7 +124,7 @@ private class AndroidOfflinePreview(context:Context,val status:(String)->Unit){
  var replay by remember{mutableStateOf(NavReplayState())}
  var simulatedOffset by remember{mutableStateOf<Point?>(null)}
  var busy by remember{mutableStateOf(false)};var consent by remember{mutableStateOf(false)}
- var error by remember{mutableStateOf("")};var speechStatus by remember{mutableStateOf("길찾기 시작에서 SIM·기기 내 음성 안내를 시작할 수 있어요")}
+ var error by remember{mutableStateOf("")};var speechStatus by remember{mutableStateOf("SIM 경로 계산·재생에서 SIM·기기 내 음성 안내를 시작할 수 있어요")}
  var active by remember{mutableStateOf(owner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))}
  var generation by remember{mutableIntStateOf(0)}
  var requestJob by remember{mutableStateOf<Job?>(null)}
@@ -243,7 +243,7 @@ private class AndroidOfflinePreview(context:Context,val status:(String)->Unit){
   onDismiss={mapDialog=false;startAfterMapConsent=false},
   onAccepted={mapDialog=false;val continueStart=startAfterMapConsent;startAfterMapConsent=false;if(continueStart&&active&&onCanRun())consent=true},
   onWithdrawalResult={saved->cancelStart();mapReadiness=NavigationMapReadiness.DISCONNECTED;error=vectorMapWithdrawalMessage(saved,mapConsent.error)})
- if(consent&&request.valid())AlertDialog(onDismissRequest={cancelStart()},title={Text("공개 좌표로 SIM 길찾기를 시작할까요?")},text={Column(Modifier.heightIn(max=400.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(10.dp)){
+ if(consent&&request.valid())AlertDialog(onDismissRequest={cancelStart()},title={Text("공개 좌표로 SIM 경로를 계산·재생할까요?")},text={Column(Modifier.heightIn(max=400.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(10.dp)){
   Text("받는 곳: router.project-osrm.org OSRM 공개 서버. 요청은 서버에 기록될 수 있습니다. 실제 집 주소·현재 GPS·가족 메모는 보내지 않습니다.")
   Text("출발·귀가: ${request.departure()?.label}\n코스: ${Catalog.routes.first{it.id==routeId}.title}\n선택 쉼터: ${request.selectedRestIds.joinToString{RestFacilities.find(it,routeId)?.name?:it}.ifEmpty{"없음"}}")
   Text("전송 좌표: "+request.points().joinToString(" → "){String.format(Locale.US,"%.5f, %.5f",it.lat,it.lon)})

@@ -593,14 +593,14 @@ class MainActivity : ComponentActivity() {
 @Composable internal fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
-    Button(onClick = onClick, enabled = enabled, interactionSource = interaction, border = if(focused) BorderStroke(4.dp, Ink) else null, modifier = modifier.heightIn(min = 76.dp), shape = RoundedCornerShape(16.dp), contentPadding = PaddingValues(horizontal = 20.dp, vertical = 13.dp), colors = ButtonDefaults.buttonColors(containerColor = Coral, contentColor = White, disabledContainerColor = Sage, disabledContentColor = Muted)) {
-        Text(text, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+    Button(onClick = onClick, enabled = enabled, interactionSource = interaction, border = if(focused) BorderStroke(4.dp, Ink) else null, modifier = modifier.heightIn(min = 76.dp), shape = RoundedCornerShape(10.dp), contentPadding = PaddingValues(horizontal = 20.dp, vertical = 13.dp), colors = ButtonDefaults.buttonColors(containerColor = Coral, contentColor = White, disabledContainerColor = Sage, disabledContentColor = Muted)) {
+        Text(text, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = if(enabled) White else Muted)
     }
 }
 @Composable internal fun SecondaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
-    OutlinedButton(onClick = onClick, interactionSource = interaction, modifier = modifier.heightIn(min = 76.dp), shape = RoundedCornerShape(16.dp), border = BorderStroke(if(focused) 3.dp else 1.dp, if(focused) Color(0xFF005FCC) else Line), contentPadding = PaddingValues(horizontal = 17.dp, vertical = 13.dp)) { Text(text, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Ink) }
+    OutlinedButton(onClick = onClick, interactionSource = interaction, modifier = modifier.heightIn(min = 76.dp), shape = RoundedCornerShape(10.dp), border = BorderStroke(if(focused) 3.dp else 1.dp, if(focused) Color(0xFF005FCC) else Line), contentPadding = PaddingValues(horizontal = 17.dp, vertical = 13.dp)) { Text(text, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Ink) }
 }
 @Composable internal fun PixelIcon(name: String, color: Color, modifier: Modifier = Modifier) {
     val rows = when (name) {

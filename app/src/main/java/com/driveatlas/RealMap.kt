@@ -53,7 +53,10 @@ internal fun fittedViewport(points:List<Point>,width:Int,height:Int,extraZoom:In
      Text("도로 기준점에서는 정차·촬영하지 마세요. 안전하게 주차한 뒤 장소 정보를 확인하세요.",color=Muted,fontSize=17.sp)
      places.forEach { place ->
       OutlinedButton(onClick={onSelect(place)},modifier=Modifier.fillMaxWidth().heightIn(min=76.dp),shape=Corner,contentPadding=PaddingValues(16.dp)){
-       Column(Modifier.fillMaxWidth()) {Text(place.name,fontSize=19.sp,color=Ink);Text(place.kinds.joinToString(" · "){it.label}+if(place.selectedRest)" · 가족 계획에 선택됨" else "",fontSize=16.sp,color=Muted)}
+       Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(16.dp)) {
+        Column(Modifier.weight(1f)) {Text(place.name,fontSize=19.sp,color=Ink);Text(place.kinds.joinToString(" · "){it.label}+if(place.selectedRest)" · 가족 계획에 선택됨" else "",fontSize=16.sp,color=Muted)}
+        AtlasSymbol("arrow",AtlasGreen,Modifier.size(24.dp))
+       }
       }
      }
     } else {

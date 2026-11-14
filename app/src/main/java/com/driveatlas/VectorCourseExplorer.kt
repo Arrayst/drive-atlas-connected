@@ -22,6 +22,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -44,6 +45,7 @@ import org.maplibre.geojson.Point as GeoPoint
 import kotlin.math.roundToInt
 
 /** Public course exploration is available in release; only SIM replay stays debug-only. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable internal fun VectorCourseExplorer(route: Route, modifier: Modifier = Modifier, controlsEnabled: Boolean = true) {
  val context = LocalContext.current
  val largeText = LocalDensity.current.fontScale > 1.5f
@@ -66,13 +68,16 @@ import kotlin.math.roundToInt
     Text("코스와 쉬어 갈 곳", fontSize = 19.sp, fontWeight = FontWeight.Bold, color = Ink)
     Text(if (largeText) "큰 글씨 · 장소는 목록에서 확인" else "파란 선: 참고 코스 · 점: 대표 좌표", fontSize = 14.sp, color = Muted)
    }
-   TextButton(onClick = { if (latestControls) { listPlaces = shown; selected = null } }, enabled = controlsEnabled, modifier = Modifier.heightIn(min = 64.dp)) { Text("${shown.size}곳 · 목록", fontSize = 16.sp) }
+   OutlinedButton(onClick = { if (latestControls) { listPlaces = shown; selected = null } }, enabled = controlsEnabled, shape = RoundedCornerShape(10.dp), modifier = Modifier.heightIn(min = 64.dp)) { Text("장소 목록 · ${shown.size}곳", fontSize = 17.sp, color = Ink) }
   }
   Box(Modifier.weight(1f).fillMaxWidth().clipToBounds().background(Color(0xFFEEF0EF))) {
    if (offlineDemo) Column(Modifier.align(Alignment.Center).padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
     Text("오프라인 상황 체험", fontSize = 20.sp, color = Ink)
     Text("연결을 멈췄어요. 빈 지도에는 경로와 핀을 그리지 않습니다. 장소 정보는 목록에서 확인할 수 있어요.", fontSize = 16.sp, color = Muted)
-    TextButton(onClick = { if (latestControls) offlineDemo = false }, enabled = controlsEnabled, modifier = Modifier.heightIn(min = 64.dp)) { Text("온라인으로") }
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+     Button(onClick = { if (latestControls) offlineDemo = false }, enabled = controlsEnabled, shape = RoundedCornerShape(10.dp), colors = ButtonDefaults.buttonColors(containerColor = AtlasGreen, contentColor = White), modifier = Modifier.heightIn(min = 76.dp)) { Text("온라인으로", fontSize = 19.sp, fontWeight = FontWeight.Bold, color = White) }
+     OutlinedButton(onClick = { if (latestControls) { listPlaces = shown; selected = null } }, enabled = controlsEnabled, shape = RoundedCornerShape(10.dp), modifier = Modifier.heightIn(min = 76.dp)) { Text("장소 목록 보기", fontSize = 19.sp, color = Ink) }
+    }
    } else VectorMapConnectionGate(VectorMapPurpose.PUBLIC_COURSE, consent, Modifier.fillMaxSize(), controlsEnabled) {
     ConnectedCourseExplorer(road, places, shown, controlsEnabled, Modifier.fillMaxSize()) { members ->
      if (latestControls) { listPlaces = members; selected = members.singleOrNull() }
@@ -81,15 +86,18 @@ import kotlin.math.roundToInt
   }
   Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
    listOf<MapPlaceKind?>(null, MapPlaceKind.COURSE, MapPlaceKind.REST, MapPlaceKind.PHOTO).forEach { kind ->
-    TextButton(onClick = { if (latestControls) filter = kind }, enabled = controlsEnabled, modifier = Modifier.weight(1f).heightIn(min = 64.dp), contentPadding = PaddingValues(2.dp),
-     colors = ButtonDefaults.textButtonColors(contentColor = if (filter == kind) NavigationRouteBlue else Muted)) {
-     Text(kind?.label ?: "전체", fontSize = 16.sp, fontWeight = if (filter == kind) FontWeight.Bold else FontWeight.Normal)
+    TextButton(onClick = { if (latestControls) filter = kind }, enabled = controlsEnabled, modifier = Modifier.weight(1f).heightIn(min = 64.dp).semantics { this.selected = filter == kind }, shape = RoundedCornerShape(8.dp), contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
+     colors = ButtonDefaults.textButtonColors(containerColor = if (filter == kind) AtlasSoft else Color.Transparent, contentColor = if (filter == kind) NavigationRouteBlue else Ink)) {
+     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+      Text(kind?.label ?: "전체", fontSize = 17.sp, fontWeight = if (filter == kind) FontWeight.Bold else FontWeight.Medium)
+      Box(Modifier.width(24.dp).height(2.dp).background(if (filter == kind) NavigationRouteBlue else Color.Transparent))
+     }
     }
    }
   }
   if (shown.isEmpty()) Text("이 필터에서 출처를 확인한 장소가 아직 없어요. 전체 목록은 그대로 볼 수 있습니다.", Modifier.padding(horizontal = 14.dp), fontSize = 14.sp, color = Muted)
   Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-   if (BuildConfig.SIMULATOR) TextButton(onClick = { if (latestControls) offlineDemo = !offlineDemo }, enabled = controlsEnabled, modifier = Modifier.heightIn(min = 64.dp)) { Text(if (offlineDemo) "온라인으로" else "오프라인 체험", fontSize = 15.sp) }
+   if (BuildConfig.SIMULATOR && !offlineDemo) TextButton(onClick = { if (latestControls) offlineDemo = true }, enabled = controlsEnabled, modifier = Modifier.heightIn(min = 64.dp)) { Text("오프라인 체험", fontSize = 15.sp) }
    Spacer(Modifier.weight(1f))
    TextButton(onClick = { if (latestControls) attributionOpen = true }, enabled = controlsEnabled, modifier = Modifier.heightIn(min = 64.dp), contentPadding = PaddingValues(horizontal = 6.dp)) {
     Column(horizontalAlignment = Alignment.End) {

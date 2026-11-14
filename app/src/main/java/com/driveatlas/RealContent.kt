@@ -117,7 +117,7 @@ internal fun regionFor(route:Route)=when(route.id){"coast"->"강릉";"forest"->"
       Text("앱 지도 선은 기본 코스입니다. 선택 휴식지는 도로 시간 계산·외부 내비 요청에 반영됩니다.",fontSize=16.sp,lineHeight=23.sp,color=Muted,modifier=Modifier.padding(top=8.dp))
       Text("현재 위치·왕복 출발지는 포함하지 않은 공개 지점 여정입니다. 휴식 장소는 공식 지도 대표점이며 차량 진입구·당일 주차 가능 여부는 미확인입니다.",fontSize=15.sp,color=Muted)
      }
-     SecondaryButton(if(status.confirmed) "다른 도착지 검색" else "기본 내비 화면 보기",if(status.confirmed) onNativeSearch else onNativeOpen,Modifier.fillMaxWidth())
+     SecondaryButton(if(status.confirmed) "다른 도착지 검색" else "기본 내비 열기 · 목적지 미전송",if(status.confirmed) onNativeSearch else onNativeOpen,Modifier.fillMaxWidth())
      OutlinedButton(onClick={advanced=!advanced},modifier=Modifier.fillMaxWidth().heightIn(min=76.dp),shape=androidx.compose.foundation.shape.RoundedCornerShape(14.dp)){
       Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){
        Text("다른 연결 방법 · 실험 기능",color=Muted,fontSize=16.sp)

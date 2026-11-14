@@ -25,8 +25,8 @@ internal fun tripDuration(minutes:Int):String = if(minutes<60) "${minutes}분" e
 }
 
 @Composable internal fun TripPanel(modifier:Modifier=Modifier, content:@Composable ColumnScope.()->Unit) {
- Surface(modifier,color=White,shape=RoundedCornerShape(24.dp)) {
-  Column(Modifier.padding(28.dp),verticalArrangement=Arrangement.spacedBy(16.dp),content=content)
+ Surface(modifier,color=White,shape=RoundedCornerShape(12.dp),border=androidx.compose.foundation.BorderStroke(1.dp,Line)) {
+  Column(Modifier.padding(24.dp),verticalArrangement=Arrangement.spacedBy(16.dp),content=content)
  }
 }
 

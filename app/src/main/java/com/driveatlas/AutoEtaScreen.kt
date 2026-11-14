@@ -17,6 +17,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -60,7 +61,7 @@ import java.util.Locale
  var details by remember { mutableStateOf(false) }
  var itineraryOpen by remember { mutableStateOf(false) }
  val route=Catalog.routes.first{it.id==routeId}
- TripHeading("왕복 도로 시간","출발부터 복귀까지 계산합니다. 휴식과 걷기는 가족 계획에서 따로 더하세요.")
+ TripHeading("왕복 도로 시간","가는 길과 돌아오는 길을 각각 계산합니다. 실시간 교통은 반영하지 않습니다.")
  TripWorkspace(firstWeight=.36f,first={ pane ->
   Column(pane,verticalArrangement=Arrangement.spacedBy(20.dp)) {
    TripPanel {
@@ -86,7 +87,7 @@ import java.util.Locale
     Catalog.routes.forEach { r ->
      val interaction=remember(r.id){MutableInteractionSource()}
      val focused by interaction.collectIsFocusedAsState()
-     Surface(onClick={routeId=r.id;reset()},color=if(r.id==routeId)AtlasSoft else White,
+     Surface(onClick={routeId=r.id;reset()},color=White,
       interactionSource=interaction,border=BorderStroke(if(focused)3.dp else 1.dp,if(focused||r.id==routeId)AtlasGreen else Line),
       shape=RoundedCornerShape(8.dp),modifier=Modifier.fillMaxWidth().heightIn(min=88.dp).semantics{selected=r.id==routeId;role=Role.RadioButton}) {
       Row(Modifier.padding(18.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(14.dp)) {
@@ -102,16 +103,39 @@ import java.util.Locale
   }
  },second={ pane ->
   TripPanel(pane) {
-   Text(if(result!=null)"왕복 도로 예상" else "이번 왕복 여정",color=Muted,fontSize=20.sp)
    val v=result
-   if(v!=null) {
-    Text(tripDuration(v.roadMinutes),fontSize=44.sp,fontWeight=FontWeight.Bold,color=Ink,letterSpacing=(-2).sp)
-    Text("${String.format(Locale.KOREA,"%.1f",v.meters/1000)} km · ${if(v.cached)"저장된 공개 결과" else "도로 기준 계산"}",fontSize=20.sp,color=Coral)
-    Text("교통·신호·주차 제외 · 휴식과 걷기는 별도",fontSize=18.sp,color=Muted)
-   } else {
-    Text("출발 → 코스 → 복귀",fontSize=30.sp,fontWeight=FontWeight.Bold,color=Ink)
-    Text("편도 시간을 두 배로 하지 않고\n돌아오는 도로까지 계산해요.",fontSize=21.sp,lineHeight=32.sp,color=Muted)
+   Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
+    Text(route.title,color=Ink,fontSize=24.sp,fontWeight=FontWeight.SemiBold)
+    Text("코스 기준점 ${route.stops.size}곳 · 선택 휴식지 ${selectedRestIds.size}곳",fontSize=18.sp,color=Muted)
    }
+   Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
+    if(v!=null) {
+     Text("왕복 도로 예상",color=Muted,fontSize=18.sp)
+     Text(tripDuration(v.roadMinutes),fontSize=44.sp,fontWeight=FontWeight.Bold,color=Ink,letterSpacing=(-2).sp)
+     Text("${String.format(Locale.KOREA,"%.1f",v.meters/1000)} km · ${if(v.cached)"저장된 공개 결과" else "도로 기준 계산"}",fontSize=20.sp,color=Ink)
+    } else {
+     Text(if(busy)"도로 시간 계산 중" else "아직 계산하지 않았습니다",fontSize=28.sp,fontWeight=FontWeight.Bold,color=Ink)
+    }
+    Text("교통·신호·주차 제외 · 휴식·걷기·여유 시간 별도",fontSize=18.sp,color=Muted)
+   }
+   if(busy){
+    LinearProgressIndicator(Modifier.fillMaxWidth())
+    SecondaryButton("계산 취소",{generation++;job?.cancel();busy=false;message="계산을 취소했어요. 요청이 이미 전송됐다면 서버 기록은 취소되지 않습니다."},Modifier.fillMaxWidth())
+   } else if(v!=null) {
+    PrimaryButton("이 시간을 가족 계획에 적용",{if(onApply(v))message="자동 시간이 가족 계획에 저장됐어요." else message="지금은 적용할 수 없어요. 주차 상태와 계산 범위를 확인하세요."},Modifier.fillMaxWidth())
+    SecondaryButton("가족 계획에서 비교",onFamily,Modifier.fillMaxWidth())
+    TextButton(onClick={result=null},modifier=Modifier.heightIn(min=76.dp)){Text("다시 계산하기",fontSize=19.sp)}
+    Text("계산 ${SimpleDateFormat("yyyy.MM.dd HH:mm",Locale.KOREA).format(Date(v.calculatedAt))} · 분 단위 올림",color=Muted,fontSize=16.sp)
+   } else {
+    PrimaryButton("왕복 시간 계산 · 전송 정보 확인",{
+     val p=if(originId==null)onCurrentPoint() else origin
+     if(p==null)message="위치 수신이 오래되어 계산을 시작하지 않았어요. 공개 기준점을 선택하세요."
+     else if(RestItinerary.route(routeId,selectedRestIds,restSlots)==null)message="선택한 휴식 장소의 좌표를 확인할 수 없어 계산하지 않았어요. 가족 계획에서 해당 장소를 제외해 주세요."
+     else{origin=p;consent=EtaRequest(routeId,p,originLabel,originId,selectedRestIds,restAfterStopIndex=restSlots)}
+    },Modifier.fillMaxWidth())
+    if(cached!=null)SecondaryButton("저장된 공개 결과 보기",{result=cached;message="저장된 공개 기준점 결과입니다. 현재 도로·교통 상태를 새로 확인한 값이 아닙니다."},Modifier.fillMaxWidth())
+   }
+   Text("계산 전 좌표·전송 대상을 확인하고 동의합니다. 개인 위치는 자동 전송·저장하지 않습니다.",color=Muted,fontSize=17.sp,lineHeight=26.sp)
    HorizontalDivider(color=Line,modifier=Modifier.padding(vertical=10.dp))
    Text("구간별 도로 시간",fontSize=21.sp,fontWeight=FontWeight.SemiBold,color=Ink)
    EtaSegment("가는 길",originLabel+" → "+route.stops.first().name,v?.outboundMinutes)
@@ -121,8 +145,8 @@ import java.util.Locale
    HorizontalDivider(color=Line)
    Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
     Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(4.dp)) {
-     Text(route.title,fontSize=21.sp,fontWeight=FontWeight.SemiBold,color=Ink)
-     Text("코스 기준점 ${route.stops.size}곳 · 선택 휴식지 ${selectedRestIds.size}곳",fontSize=17.sp,color=Muted)
+     Text("경유·휴식 계획",fontSize=21.sp,fontWeight=FontWeight.SemiBold,color=Ink)
+     Text("가족 계획의 장소와 순서 사용",fontSize=17.sp,color=Muted)
     }
     TextButton(onClick={itineraryOpen=!itineraryOpen},modifier=Modifier.heightIn(min=76.dp)) {
      Text(if(itineraryOpen)"순서 접기" else "경유 순서",fontSize=18.sp)
@@ -134,27 +158,7 @@ import java.util.Locale
     Text("${facility.name} · "+if(facility.point==null)"좌표 미확인 · 계산할 수 없음" else "공개 시설 좌표 · 차량 진입점 미검증",fontSize=18.sp,color=Muted)
    }}
    }
-   if(selectedRestIds.isNotEmpty())Text("가족 계획에서 지정한 코스 구간에 휴식지를 삽입합니다. 휴식·걷기·여유 시간은 도로 예상 시간에 포함하지 않습니다.",fontSize=18.sp,color=Muted)
    if(!busy)SecondaryButton("휴식 장소·순서 변경",onFamily,Modifier.fillMaxWidth())
-   Spacer(Modifier.height(8.dp))
-   if(busy){
-    LinearProgressIndicator(Modifier.fillMaxWidth())
-    SecondaryButton("계산 취소",{generation++;job?.cancel();busy=false;message="계산을 취소했어요. 요청이 이미 전송됐다면 서버 기록은 취소되지 않습니다."},Modifier.fillMaxWidth())
-   } else if(v!=null) {
-    PrimaryButton("이 시간을 가족 계획에 적용",{if(onApply(v))message="자동 시간이 가족 계획에 저장됐어요." else message="지금은 적용할 수 없어요. 주차 상태와 계산 범위를 확인하세요."},Modifier.fillMaxWidth())
-    SecondaryButton("가족 계획에서 비교",onFamily,Modifier.fillMaxWidth())
-    TextButton(onClick={result=null},modifier=Modifier.heightIn(min=76.dp)){Text("다시 계산하기",fontSize=19.sp)}
-    Text("계산 ${SimpleDateFormat("yyyy.MM.dd HH:mm",Locale.KOREA).format(Date(v.calculatedAt))} · 분 단위 올림",color=Muted,fontSize=16.sp)
-   } else {
-    PrimaryButton("전송 정보 확인 후 계산",{
-     val p=if(originId==null)onCurrentPoint() else origin
-     if(p==null)message="위치 수신이 오래되어 계산을 시작하지 않았어요. 공개 기준점을 선택하세요."
-     else if(RestItinerary.route(routeId,selectedRestIds,restSlots)==null)message="선택한 휴식 장소의 좌표를 확인할 수 없어 계산하지 않았어요. 가족 계획에서 해당 장소를 제외해 주세요."
-     else{origin=p;consent=EtaRequest(routeId,p,originLabel,originId,selectedRestIds,restAfterStopIndex=restSlots)}
-    },Modifier.fillMaxWidth())
-    if(cached!=null)SecondaryButton("저장된 공개 결과 보기",{result=cached;message="저장된 공개 기준점 결과입니다. 현재 도로·교통 상태를 새로 확인한 값이 아닙니다."},Modifier.fillMaxWidth())
-   }
-   Text("좌표와 전송 대상을 확인한 뒤 요청마다 동의해요. 개인 위치는 자동 전송·저장하지 않아요.",color=Muted,fontSize=17.sp,lineHeight=26.sp)
   }
  })
  if(message.isNotBlank())Text(message,color=Coral,fontSize=20.sp,modifier=Modifier.padding(vertical=20.dp))
@@ -187,11 +191,22 @@ import java.util.Locale
 }
 
 @Composable private fun EtaSegment(label:String,route:String,minutes:Int?) {
- Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(20.dp),verticalAlignment=Alignment.CenterVertically) {
-  Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(5.dp)) {
-   Text(label,fontSize=20.sp,fontWeight=FontWeight.SemiBold,color=Ink)
-   Text(route,fontSize=18.sp,lineHeight=26.sp,color=Muted)
+ val fontScale=LocalDensity.current.fontScale
+ BoxWithConstraints(Modifier.fillMaxWidth()) {
+  val description:@Composable ()->Unit={
+   Column(verticalArrangement=Arrangement.spacedBy(5.dp)) {
+    Text(label,fontSize=20.sp,fontWeight=FontWeight.SemiBold,color=Ink)
+    Text(route,fontSize=18.sp,lineHeight=26.sp,color=Muted)
+   }
   }
-  Text(minutes?.let{tripDuration(it)}?:"계산 전",fontSize=22.sp,fontWeight=FontWeight.Bold,color=if(minutes==null)Muted else AtlasGreen)
+  val duration:@Composable ()->Unit={
+   Text(minutes?.let{tripDuration(it)}?:"계산 전",fontSize=22.sp,fontWeight=FontWeight.Bold,color=if(minutes==null)Muted else Ink)
+  }
+  if(maxWidth<420.dp||fontScale>1.25f)Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
+   description();duration()
+  } else Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(20.dp),verticalAlignment=Alignment.CenterVertically) {
+   Box(Modifier.weight(1f)){description()}
+   duration()
+  }
  }
 }

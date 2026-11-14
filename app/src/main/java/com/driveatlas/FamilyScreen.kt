@@ -22,6 +22,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -41,11 +42,10 @@ import java.util.UUID
  var explain by remember { mutableStateOf(false) }
  TripHeading("가족 여행 계획","왕복 주행과 휴식 시간을 합쳐, 오늘 가능한 코스를 비교하세요.")
  Surface(Modifier.fillMaxWidth().padding(bottom=24.dp),color=White,shape=RoundedCornerShape(12.dp),border=BorderStroke(1.dp,Line)) {
-  Column(Modifier.padding(24.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+  Column(Modifier.padding(horizontal=24.dp,vertical=18.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(28.dp),verticalAlignment=Alignment.CenterVertically) {
     Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-     Text("${p.carName} · 오늘의 조건",fontSize=20.sp,fontWeight=FontWeight.SemiBold,color=Muted)
-     Text("사용 가능 ${tripDuration(p.availableMinutes)}",fontSize=26.sp,fontWeight=FontWeight.Bold,color=Ink)
+     Text("${p.carName} · 오늘 ${tripDuration(p.availableMinutes)} 가능",fontSize=24.sp,fontWeight=FontWeight.Bold,color=Ink)
      Text("걷기 ${p.walkMinutes}분 이내 · 연속 주행 ${p.maxContinuousDrivingMinutes?.let{"${it}분 이내"}?:"미설정"}",fontSize=20.sp,lineHeight=28.sp,color=Ink)
      Text("${if(p.restroomRequired) "화장실 필수" else "화장실 조건 없음"} · ${if(p.strollerRequired) "유모차 이동" else "유모차 조건 없음"}",fontSize=18.sp,color=Muted)
     }
@@ -75,8 +75,8 @@ import java.util.UUID
     val active=m.route.id==selected.route.id
     val interaction=remember(m.route.id){MutableInteractionSource()}
     val focused by interaction.collectIsFocusedAsState()
-    Surface(onClick={selectedId=m.route.id;expandedRoute=null},shape=RoundedCornerShape(8.dp),color=if(active)AtlasSoft else White,
-     interactionSource=interaction,border=BorderStroke(if(focused)3.dp else 1.dp,if(active||focused)AtlasGreen else Line),
+    Surface(onClick={selectedId=m.route.id;expandedRoute=null},shape=RoundedCornerShape(12.dp),color=White,
+     interactionSource=interaction,border=BorderStroke(if(focused)3.dp else if(active)2.dp else 1.dp,if(active||focused)AtlasGreen else Line),
      modifier=Modifier.fillMaxWidth().heightIn(min=76.dp).semantics{this.selected=active;role=Role.RadioButton}) {
      Column(Modifier.padding(20.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
       Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
@@ -84,7 +84,7 @@ import java.util.UUID
        TripSelectionMark(active)
       }
       Text(if(m.plan.transferKnown)tripDuration(m.totalMinutes) else "왕복 시간 미입력",fontSize=if(m.plan.transferKnown)28.sp else 23.sp,fontWeight=FontWeight.Bold,color=Ink)
-      Text(when{m.conflicts.isNotEmpty()->"조건 조정 ${m.conflicts.size}개";m.unknowns.isNotEmpty()->"추가 확인 ${m.unknowns.size}개";else->"입력 조건 충족"},fontSize=18.sp,color=if(m.conflicts.isEmpty()&&m.unknowns.isEmpty())Coral else Muted)
+      Text(when{m.conflicts.isNotEmpty()->"조건 조정 ${m.conflicts.size}개";m.unknowns.isNotEmpty()->"추가 확인 ${m.unknowns.size}개";else->"입력 조건 충족"},fontSize=18.sp,color=when {m.conflicts.isNotEmpty()->Color(0xFFB64036);m.unknowns.isNotEmpty()->Color(0xFF8A5900);else->Color(0xFF26765F)})
      }
     }
    }
@@ -120,47 +120,57 @@ import java.util.UUID
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable private fun FamilyComparisonCard(m:FamilyMatch,expanded:Boolean,onExpand:()->Unit,onRoute:()->Unit,available:Int) {
- val statusColor=when { m.conflicts.isNotEmpty()->Color(0xFFB64036); m.unknowns.isNotEmpty()->Color(0xFF8A5900); else->Coral }
- val status=when { m.conflicts.isNotEmpty()->"계획을 조금 조정해 주세요"; m.unknowns.isNotEmpty()->"출발 전에 확인이 필요해요"; else->"입력한 조건에 맞는 길이에요" }
+ val statusColor=when { m.conflicts.isNotEmpty()->Color(0xFFB64036); m.unknowns.isNotEmpty()->Color(0xFF8A5900); else->Color(0xFF26765F) }
+ val status=when { m.conflicts.isNotEmpty()->"계획 조정 ${m.conflicts.size}개"; m.unknowns.isNotEmpty()->"출발 전 확인 ${m.unknowns.size}개"; else->"입력 조건 충족" }
  TripPanel(Modifier.fillMaxWidth()) {
-  Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(22.dp),verticalAlignment=Alignment.CenterVertically) {
-   RoutePhoto(m.route,Modifier.size(88.dp).clip(RoundedCornerShape(8.dp)))
-   Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(10.dp)) {
-    Text(m.route.title,fontSize=29.sp,fontWeight=FontWeight.Bold,color=Ink)
+  Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(18.dp),verticalAlignment=Alignment.CenterVertically) {
+   RoutePhoto(m.route,Modifier.size(72.dp).clip(RoundedCornerShape(8.dp)))
+   Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+    Text(m.route.title,fontSize=28.sp,fontWeight=FontWeight.Bold,color=Ink)
     Text(m.route.subtitle,fontSize=18.sp,color=Muted)
    }
   }
-  Text("왕복 포함 전체 계획 · "+if(m.plan.etaCalculatedAt!=null)"도로 예상 적용" else "수동 입력 기준",fontSize=19.sp,color=Muted,modifier=Modifier.padding(top=12.dp))
-  Text(if(m.plan.transferKnown)tripDuration(m.totalMinutes) else "시간을 더 알려주세요",fontSize=if(m.plan.transferKnown)40.sp else 30.sp,fontWeight=FontWeight.Bold,color=Ink,letterSpacing=(-1).sp)
-  Text(if(m.plan.transferKnown) {val delta=available-m.totalMinutes;if(delta>=0)"사용 가능 시간에서 ${tripDuration(delta)} 남음" else "사용 가능 시간보다 ${tripDuration(-delta)} 초과"} else "확인된 구간만 ${tripDuration(m.totalMinutes)} · 전체 시간은 아직 미정",fontSize=20.sp,color=statusColor)
-  HorizontalDivider(color=Line,modifier=Modifier.padding(vertical=6.dp))
-  Text("주행",fontSize=20.sp,fontWeight=FontWeight.SemiBold,color=Ink)
-  FlowRow(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
-   listOf("가는 길" to (m.plan.outboundMinutes?.let{tripDuration(it)}?:"미입력"),"코스 주행" to tripDuration(m.plan.courseDriveMinutes?:m.route.minutes),"돌아오는 길" to (m.plan.returnMinutes?.let{tripDuration(it)}?:"미입력")).forEach{(label,value)->
-    Column(Modifier.widthIn(min=140.dp).weight(1f),verticalArrangement=Arrangement.spacedBy(9.dp)){Text(label,fontSize=18.sp,color=Muted);Text(value,fontSize=25.sp,fontWeight=FontWeight.SemiBold,color=Ink)}
+  BoxWithConstraints(Modifier.fillMaxWidth()) {
+   val total:@Composable ()->Unit = {
+    Column(verticalArrangement=Arrangement.spacedBy(6.dp)) {
+     Text("왕복·휴식 포함 전체 일정",fontSize=18.sp,color=Muted)
+     Text(if(m.plan.transferKnown)tripDuration(m.totalMinutes) else "왕복 시간 미입력",fontSize=if(m.plan.transferKnown)36.sp else 28.sp,fontWeight=FontWeight.Bold,color=Ink)
+    }
+   }
+   val remaining:@Composable ()->Unit = {
+    Text(if(m.plan.transferKnown) {val delta=available-m.totalMinutes;if(delta>=0)"${tripDuration(delta)} 여유" else "${tripDuration(-delta)} 초과"} else "확인된 구간만 ${tripDuration(m.totalMinutes)}\n전체 시간은 아직 미정",fontSize=19.sp,color=statusColor)
+   }
+   if(maxWidth<620.dp||LocalDensity.current.fontScale>1.4f)Column(verticalArrangement=Arrangement.spacedBy(12.dp)){total();remaining()}
+   else Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(20.dp)) {
+    Box(Modifier.weight(1f)){total()};remaining()
    }
   }
-  HorizontalDivider(color=Line)
-  FlowRow(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
-   listOf("휴식" to m.plan.effectiveRestMinutes,"걷기" to m.plan.walkMinutes,"추가 여유" to m.plan.bufferMinutes).forEach{(label,value)->
-    Column(Modifier.widthIn(min=140.dp).weight(1f),verticalArrangement=Arrangement.spacedBy(9.dp)){Text(label,fontSize=18.sp,color=Muted);Text(tripDuration(value),fontSize=23.sp,fontWeight=FontWeight.SemiBold,color=Ink)}
+  Surface(color=statusColor.copy(alpha=.07f),shape=RoundedCornerShape(8.dp)) {
+   Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+    Text(status,fontSize=20.sp,fontWeight=FontWeight.Bold,color=statusColor)
+    (m.conflicts+m.unknowns).forEach{Text("• $it",fontSize=18.sp,lineHeight=27.sp,color=statusColor)}
+    if(m.conflicts.isEmpty()&&m.unknowns.isEmpty())Text("선택한 휴식지의 당일 운영·현장 접근은 확인해 주세요.",fontSize=17.sp,color=statusColor)
    }
   }
-  if(m.plan.departureMinuteOfDay!=null)Text("${clockLabel(m.plan.departureMinuteOfDay)} 출발 → ${if(m.plan.returnNextDay)"다음 날 " else ""}${clockLabel(m.plan.returnDeadlineMinuteOfDay)} 복귀 마감",fontSize=19.sp,color=Ink)
-  Text("휴식 장소 ${m.plan.effectiveRestFacilityIds.size}곳",fontSize=18.sp,color=Muted)
-  Text(if(m.plan.etaCalculatedAt!=null) "OSRM 도로 예상 적용 · 실시간 교통 미반영" else "수동 입력 계획 · 실시간 교통 미반영",fontSize=17.sp,color=Muted)
-  HorizontalDivider(color=Line)
-  Surface(color=statusColor.copy(alpha=.07f),shape=RoundedCornerShape(10.dp)) {
-   Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
-    Text(status,fontSize=22.sp,fontWeight=FontWeight.Bold,color=statusColor)
-    (m.conflicts+m.unknowns).forEach{Text("• $it",fontSize=19.sp,lineHeight=28.sp,color=statusColor)}
-    if(m.conflicts.isEmpty()&&m.unknowns.isEmpty())Text("입력 시간·선택 휴식지 공개정보 기준\n당일 운영과 현장 접근은 확인해 주세요.",fontSize=19.sp,lineHeight=28.sp,color=statusColor)
-   }
-  }
+  // Keep the next action above the detailed breakdown, including in a split vehicle window.
   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(12.dp)) {
    SecondaryButton(if(expanded)"계획 접기" else "시간·휴식 조정",onExpand,Modifier.weight(.45f))
    PrimaryButton("코스 상세 · 내비 연결",onRoute,Modifier.weight(.55f))
   }
+  HorizontalDivider(color=Line)
+  FlowRow(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(16.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
+   listOf("가는 길" to (m.plan.outboundMinutes?.let{tripDuration(it)}?:"미입력"),"코스 주행" to tripDuration(m.plan.courseDriveMinutes?:m.route.minutes),"돌아오는 길" to (m.plan.returnMinutes?.let{tripDuration(it)}?:"미입력")).forEach{(label,value)->
+    Column(Modifier.widthIn(min=140.dp).weight(1f),verticalArrangement=Arrangement.spacedBy(6.dp)){Text(label,fontSize=17.sp,color=Muted);Text(value,fontSize=23.sp,fontWeight=FontWeight.SemiBold,color=Ink)}
+   }
+  }
+  FlowRow(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(16.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
+   listOf("휴식" to m.plan.effectiveRestMinutes,"걷기" to m.plan.walkMinutes,"추가 여유" to m.plan.bufferMinutes).forEach{(label,value)->
+    Column(Modifier.widthIn(min=140.dp).weight(1f),verticalArrangement=Arrangement.spacedBy(6.dp)){Text(label,fontSize=17.sp,color=Muted);Text(tripDuration(value),fontSize=23.sp,fontWeight=FontWeight.SemiBold,color=Ink)}
+   }
+  }
+  HorizontalDivider(color=Line)
+  if(m.plan.departureMinuteOfDay!=null)Text("${clockLabel(m.plan.departureMinuteOfDay)} 출발 → ${if(m.plan.returnNextDay)"다음 날 " else ""}${clockLabel(m.plan.returnDeadlineMinuteOfDay)} 복귀 마감",fontSize=18.sp,color=Ink)
+  Text("휴식 장소 ${m.plan.effectiveRestFacilityIds.size}곳 · "+if(m.plan.etaCalculatedAt!=null) "OSRM 도로 예상 적용 · 실시간 교통 미반영" else "수동 입력 기준 · 실시간 교통 미반영",fontSize=16.sp,color=Muted)
   m.feedbackReasons.forEach { Text(it,fontSize=18.sp,color=Coral) }
   Text(m.previousRating?.let{"직접 남긴 이전 평가 ${String.format(Locale.KOREA,"%.1f",it)}/5 반영"}?:"아직 직접 남긴 코스 평가가 없어요.",fontSize=16.sp,color=Muted)
  }
@@ -176,7 +186,7 @@ import java.util.UUID
   PlanningSectionTitle("시간 한도","모든 선택값은 분 단위입니다.")
   PlanningTimeChoices("사용 가능 시간",listOf("60","120","180","240","360","480","720"),draft.availableMinutes.toString()){draft=draft.copy(availableMinutes=it.toInt())}
   PlanningTimeChoices("연속 주행 한도",listOf("미설정","30","60","90","120","180","240","360"),draft.maxContinuousDrivingMinutes?.toString()?:"미설정"){draft=draft.copy(maxContinuousDrivingMinutes=it.toIntOrNull())}
-  PlanningTimeChoices("걷기 한도",listOf("0","10","20","40"),draft.walkMinutes.toString()){draft=draft.copy(walkMinutes=it.toInt())}
+  PlanningTimeChoices("걷기 한도",FamilyWalkMinuteChoices,draft.walkMinutes.toString()){draft=draft.copy(walkMinutes=it.toInt())}
   PlanningSectionTitle("시설·이동 조건","필요한 조건만 선택하세요.")
   FlowRow(horizontalArrangement=Arrangement.spacedBy(16.dp)) {
    FilterChip(selected=draft.restroomRequired,onClick={draft=draft.copy(restroomRequired=!draft.restroomRequired)},label={Text("화장실 필수")},modifier=Modifier.heightIn(min=76.dp))
@@ -252,10 +262,13 @@ import java.util.UUID
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable private fun PlanningTimeChoices(label:String,values:List<String>,selected:String,onSelect:(String)->Unit) {
+ // Preserve the value loaded when this editor opened, even after another chip is selected.
+ val initialSelection=remember(label,values){selected}
+ val options=planningTimeChoiceValues(values,initialSelection,selected)
  Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(8.dp)) {
   Text(label,fontSize=20.sp,fontWeight=FontWeight.SemiBold,color=Ink)
   FlowRow(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-   (if(selected in values)values else listOf(selected)+values).forEach { value ->
+   options.forEach { value ->
     FilterChip(selected=value==selected,onClick={onSelect(value)},
      label={Text(if(value.toIntOrNull()!=null)"${value}분" else value,fontSize=20.sp,fontWeight=if(value==selected)FontWeight.Bold else FontWeight.Normal)},
      modifier=Modifier.heightIn(min=76.dp).widthIn(min=96.dp),shape=RoundedCornerShape(8.dp),
@@ -316,13 +329,14 @@ private fun clockLabel(minute:Int?)=minute?.let{String.format(Locale.KOREA,"%02d
  onEdit:(String,Int,String,String?,List<String>)->Boolean,onDelete:(String)->Boolean,
  currentTrip:Trip?=null) {
  ProvideTextStyle(androidx.compose.ui.text.TextStyle(fontSize=18.sp,lineHeight=28.sp,color=Ink)) {
- TripHeading("우리 차의 여행 기억","어떤 여행이었나요? 코스와 기록 종류를 고른 뒤 만족도를 남겨 주세요.")
- Text("계정·클라우드 없이 이 앱 안에 저장됩니다. 직접 남긴 기록은 GPS 방문 인증이나 완주 배지가 아닙니다. 개인 신상이나 건강정보는 메모에 넣지 마세요.",color=Muted,modifier=Modifier.padding(bottom=24.dp))
+ TripHeading("우리 차의 여행 기억","다녀온 코스와 만족도를 모아, 다음 여행에 참고하세요.")
+ Text("이 기기에만 저장되는 여행 기록입니다. GPS 방문 인증이나 완주 배지와는 구분해요.",color=Muted,fontSize=17.sp,modifier=Modifier.padding(bottom=24.dp))
  var newDraftId by rememberSaveable{mutableStateOf<String?>(null)}
  var editId by rememberSaveable{mutableStateOf<String?>(null)}
  var deleteId by rememberSaveable{mutableStateOf<String?>(null)}
  var savedMessage by rememberSaveable{mutableStateOf("")}
- TripWorkspace(firstWeight=.48f,first={ pane ->
+ var ratingInfoOpen by rememberSaveable{mutableStateOf(false)}
+ TripWorkspace(firstWeight=.32f,first={ pane ->
   Column(pane,verticalArrangement=Arrangement.spacedBy(16.dp)) {
    TripPanel(Modifier.fillMaxWidth()) {
     Text(snapshot.preferences.carName,fontSize=18.sp,color=Muted)
@@ -332,10 +346,18 @@ private fun clockLabel(minute:Int?)=minute?.let{String.format(Locale.KOREA,"%02d
     if(snapshot.memories.size>=500)Text("이 기기의 기억 500개 한도에 도달했어요. 기존 기록은 자동 삭제하지 않습니다. 직접 불필요한 기억을 삭제한 뒤 새 기억을 저장하세요.",color=Coral)
     PrimaryButton("새로운 기억 남기기",{newDraftId=UUID.randomUUID().toString();savedMessage=""},Modifier.fillMaxWidth(),enabled=snapshot.memories.size<500)
    }
-   TripPanel(Modifier.fillMaxWidth()) {
-    Text("평점은 어디에 쓰이나요?",fontSize=22.sp,fontWeight=FontWeight.Bold,color=Ink)
-    Text("실제 여행 평점만 ‘가족 비교’의 코스 정렬에 반영합니다. 가족 조건과 개선 선택을 먼저 비교하고, 그다음 코스별 평균 평점을 참고해요.",color=Muted)
-    Text("홈 추천은 바꾸지 않습니다. SIM 평점과 날짜·메모·느낌은 가족 비교 점수에 반영하지 않습니다.",fontSize=17.sp,color=Muted)
+   Column(Modifier.fillMaxWidth().padding(horizontal=4.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+    TextButton(onClick={ratingInfoOpen=!ratingInfoOpen},modifier=Modifier.fillMaxWidth().heightIn(min=76.dp),contentPadding=PaddingValues(horizontal=12.dp)) {
+     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically) {
+      Text("평점이 반영되는 방식",fontSize=18.sp,color=Ink)
+      Text(if(ratingInfoOpen)"접기" else "보기",fontSize=17.sp,color=AtlasGreen)
+     }
+    }
+    Text("실제 여행 평점은 가족 비교에 반영됩니다. SIM·시연 평점은 제외해요.",color=Muted,fontSize=17.sp,lineHeight=26.sp)
+    if(ratingInfoOpen) {
+     Text("가족 조건과 개선 선택을 먼저 비교하고, 그다음 직접 남긴 코스별 평균 평점을 참고합니다.",color=Muted,fontSize=17.sp,lineHeight=26.sp)
+     Text("홈 추천은 바꾸지 않습니다. 날짜·메모·느낌은 가족 비교 점수에 반영하지 않습니다.",color=Muted,fontSize=17.sp,lineHeight=26.sp)
+    }
     SecondaryButton("가족 비교에서 보기",onCompare,Modifier.fillMaxWidth())
    }
   }
@@ -348,17 +370,28 @@ private fun clockLabel(minute:Int?)=minute?.let{String.format(Locale.KOREA,"%02d
     Text("여행한 길과 만족도를 남기면 이곳에 모입니다. 날짜와 메모는 선택 사항이에요.",color=Muted)
    }
    snapshot.memories.asReversed().forEach {m ->
-    Card(Modifier.fillMaxWidth().padding(bottom=16.dp),shape=RoundedCornerShape(12.dp),colors=CardDefaults.cardColors(containerColor=White)) {
-     Column(Modifier.padding(20.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-      Text(Catalog.routes.first{it.id==m.routeId}.title,fontWeight=FontWeight.Bold,fontSize=21.sp)
-      Text("${m.carName} · ${m.rating}/5 · ${familyRatingMeaning(m.rating)}")
-      Text("여행 날짜 ${m.tripDate?:"미입력"} · 저장 ${SimpleDateFormat("yyyy.MM.dd",Locale.KOREA).format(Date(m.createdMs))}",color=Muted)
-      Text(if(m.feelingTags.isEmpty())"느낌 미선택" else m.feelingTags.joinToString(" · "),color=Coral)
-      Text(if(m.simulated)"SIM·시연 기록 · 가족 비교 평점 제외" else "실제 여행으로 남긴 기록 · 방문 미인증",color=Muted)
-      if(m.note.isNotBlank())Text(m.note)
-      FlowRow(horizontalArrangement=Arrangement.spacedBy(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-       OutlinedButton(onClick={editId=m.id},modifier=Modifier.heightIn(min=76.dp),shape=RoundedCornerShape(12.dp),border=BorderStroke(1.dp,Line)){Text("기억 수정",fontSize=18.sp)}
-       OutlinedButton(onClick={deleteId=m.id},modifier=Modifier.heightIn(min=76.dp),shape=RoundedCornerShape(12.dp),border=BorderStroke(1.dp,Line)){Text("기억 삭제",fontSize=18.sp)}
+    val route=Catalog.routes.first{it.id==m.routeId}
+    Surface(Modifier.fillMaxWidth().padding(bottom=16.dp),shape=RoundedCornerShape(12.dp),color=White,border=BorderStroke(1.dp,Line)) {
+     Column(Modifier.padding(24.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+      Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(16.dp)) {
+       Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(6.dp)) {
+        Text(if(m.simulated)"SIM · 시연" else "직접 남긴 실제 여행",fontSize=16.sp,fontWeight=FontWeight.SemiBold,color=if(m.simulated)Muted else Color(0xFF26765F))
+        Text(route.title,fontWeight=FontWeight.Bold,fontSize=24.sp,color=Ink)
+        Text("${m.carName} · 여행 날짜 ${m.tripDate?:"미입력"}",fontSize=17.sp,color=Muted)
+       }
+      }
+      FlowRow(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+       Text("${m.rating} / 5",fontSize=24.sp,fontWeight=FontWeight.Bold,color=Ink)
+       Text(familyRatingMeaning(m.rating),fontSize=18.sp,color=Ink)
+      }
+      if(m.feelingTags.isNotEmpty())Text(m.feelingTags.joinToString(" · "),fontSize=17.sp,color=Muted)
+      if(m.note.isNotBlank())Text(m.note,fontSize=19.sp,lineHeight=28.sp,color=Ink)
+      Text(if(m.simulated)"가족 비교 평점에 반영하지 않는 연습 기록입니다." else "실제 여행으로 직접 남긴 기록이며 방문 인증은 아닙니다.",fontSize=16.sp,lineHeight=24.sp,color=Muted)
+      HorizontalDivider(color=Line)
+      FlowRow(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+       Text("저장 ${SimpleDateFormat("yyyy.MM.dd",Locale.KOREA).format(Date(m.createdMs))}",fontSize=16.sp,color=Muted,modifier=Modifier.align(Alignment.CenterVertically).weight(1f))
+       OutlinedButton(onClick={editId=m.id},modifier=Modifier.heightIn(min=76.dp),shape=RoundedCornerShape(10.dp),border=BorderStroke(1.dp,Line)){Text("기억 수정",fontSize=18.sp,color=Ink)}
+       TextButton(onClick={deleteId=m.id},modifier=Modifier.heightIn(min=76.dp)){Text("기억 삭제",fontSize=18.sp,color=Muted)}
       }
      }
     }
@@ -393,14 +426,14 @@ private fun clockLabel(minute:Int?)=minute?.let{String.format(Locale.KOREA,"%02d
  // A failed attempt applies only until the user changes an input, not to later drafts.
  var saveError by remember(draft){mutableStateOf(false)}
  Dialog(onDismissRequest=onCancel,properties=DialogProperties(usePlatformDefaultWidth=false)) {
-  Surface(Modifier.widthIn(max=1100.dp).fillMaxWidth(.94f).fillMaxHeight(.94f).imePadding(),shape=RoundedCornerShape(12.dp),color=White) {
+  Surface(Modifier.widthIn(max=1100.dp).fillMaxWidth(.94f).heightIn(max=960.dp).imePadding(),shape=RoundedCornerShape(12.dp),color=White) {
    Column {
     Row(Modifier.fillMaxWidth().padding(horizontal=24.dp),verticalAlignment=Alignment.CenterVertically) {
      Text(if(editing)"기억과 평가 수정" else "이번 여행은 어땠나요?",fontSize=26.sp,fontWeight=FontWeight.Bold,color=Ink,modifier=Modifier.weight(1f))
      TextButton(onClick=onCancel,modifier=Modifier.heightIn(min=76.dp)){Text("닫기",fontSize=20.sp)}
     }
     HorizontalDivider(color=Line)
-    Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(24.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
+    Column(Modifier.weight(1f,false).verticalScroll(rememberScrollState()).padding(24.dp),verticalArrangement=Arrangement.spacedBy(18.dp)) {
      if(editing) {
       Text(Catalog.routes.first{it.id==draft.routeId}.title,fontSize=23.sp,fontWeight=FontWeight.Bold,color=Ink)
       Text("${draft.kind!!.label} · 기존 코스와 기록 종류는 유지됩니다.",color=Muted)
@@ -434,6 +467,7 @@ private fun clockLabel(minute:Int?)=minute?.let{String.format(Locale.KOREA,"%02d
      }
      if(detailsOpen) {
       MemoryDetailsEditor(draft.tripDate,draft.feelingTags,{draft=draft.copy(tripDate=it)},{draft=draft.copy(feelingTags=it)})
+      Text("개인 신상이나 건강정보는 메모에 넣지 마세요.",fontSize=16.sp,color=Muted)
       OutlinedTextField(value=draft.note,onValueChange={draft=draft.copy(note=it.take(280))},label={Text("기억하고 싶은 점 (선택, 280자)")},textStyle=androidx.compose.ui.text.TextStyle(fontSize=20.sp,lineHeight=30.sp),modifier=Modifier.fillMaxWidth(),minLines=2)
      }
     }
@@ -463,7 +497,7 @@ private fun clockLabel(minute:Int?)=minute?.let{String.format(Locale.KOREA,"%02d
    val active=rating==value
    val interaction=remember(value){MutableInteractionSource()}
    val focused by interaction.collectIsFocusedAsState()
-   Surface(onClick={onSelect(value)},interactionSource=interaction,color=if(active)AtlasSoft else White,shape=RoundedCornerShape(12.dp),border=BorderStroke(if(focused)3.dp else 1.dp,if(active||focused)AtlasGreen else Line),modifier=Modifier.widthIn(min=150.dp).heightIn(min=90.dp).semantics{selected=active;role=Role.RadioButton}) {
+   Surface(onClick={onSelect(value)},interactionSource=interaction,color=if(active)AtlasSoft else White,shape=RoundedCornerShape(12.dp),border=BorderStroke(if(focused)3.dp else 1.dp,if(active||focused)AtlasGreen else Line),modifier=Modifier.widthIn(min=150.dp).weight(1f).heightIn(min=100.dp).semantics{selected=active;role=Role.RadioButton}) {
     Column(Modifier.padding(horizontal=18.dp,vertical=12.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
      Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
       Text("${value}점",fontSize=24.sp,fontWeight=FontWeight.Bold,color=Ink)

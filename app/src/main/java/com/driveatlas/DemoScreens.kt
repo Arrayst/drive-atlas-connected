@@ -28,7 +28,7 @@ internal fun filteredRoutes(mode:String,season:String,mood:String,region:String,
 @Composable internal fun ChoiceRow(label:String,values:List<String>,selected:String,onSelect:(String)->Unit){
  Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)){
   Text(label,Modifier.width(100.dp),fontSize=18.sp,color=Muted)
-  values.forEach{v->FilterChip(selected=v==selected,onClick={onSelect(v)},label={Text(v,fontSize=20.sp)},modifier=Modifier.heightIn(min=76.dp).widthIn(min=76.dp),shape=RoundedCornerShape(14.dp),colors=FilterChipDefaults.filterChipColors(selectedContainerColor=Coral,selectedLabelColor=White))}
+  values.forEach{v->FilterChip(selected=v==selected,onClick={onSelect(v)},label={Text(v,fontSize=20.sp)},modifier=Modifier.heightIn(min=76.dp).widthIn(min=76.dp),shape=RoundedCornerShape(10.dp),colors=FilterChipDefaults.filterChipColors(selectedContainerColor=AtlasSoft,selectedLabelColor=AtlasGreen))}
  }
 }
 internal class GuideFilters {
